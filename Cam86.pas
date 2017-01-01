@@ -1,3 +1,10 @@
+{
+*********************************************************************** 
+This file is the original Delphi library written by Gilmanov Rim
+All comments have been "google translated" in english 
+***********************************************************************
+}
+
 unit cam86;
 
 interface

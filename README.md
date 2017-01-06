@@ -5,13 +5,13 @@ This project is based on Ukrainian telescope amateurs work
 
 Most of their work is shared on this huge forum thread :
 
-    http://www.astroclub.kiev.ua/forum/index.php?topic=28929.0
+http://www.astroclub.kiev.ua/forum/index.php?topic=28929.0
 
 See also
 
-    http://www.cloudynights.com/topic/497530-diy-astro-ccd-16-bit-color-6mpx-camera/
+http://www.cloudynights.com/topic/497530-diy-astro-ccd-16-bit-color-6mpx-camera/
     
-    http://astroccd.org/
+http://astroccd.org/
 
 Original code was written in Delphi by Gilmanov Rim (Гильманов Рим)
 
@@ -25,4 +25,5 @@ All derived work from this code must be kept free and opensource
 
 
 Of course, Indi project :
-    http://indilib.org
+
+http://indilib.org

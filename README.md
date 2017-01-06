@@ -27,3 +27,7 @@ All derived work from this code must be kept free and opensource
 Of course, Indi project :
 
 http://indilib.org
+
+French forum, about construction :
+
+http://www.webastro.net/forum/showthread.php?t=141764

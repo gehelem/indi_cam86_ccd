@@ -26,52 +26,57 @@
 
 #include <indiccd.h>
 
-class Cam86CCD : public INDI::CCD
-{
+class Cam86CCD : public INDI::CCD {
 public:
-    Cam86CCD();
+     Cam86CCD();
 
-    bool ISNewNumber (const char *dev, const char *name, double values[], char *names[], int n);
-    bool ISNewSwitch (const char *dev, const char *name, ISState *states, char *names[], int n);
+     bool ISNewNumber ( const char *dev, const char *name, double values[], char *names[], int n );
+     bool ISNewSwitch ( const char *dev, const char *name, ISState *states, char *names[], int n );
 
 
 protected:
-    // General device functions
-    bool Connect();
-    bool Disconnect();
-    const char *getDefaultName();
-    bool initProperties();
-    bool updateProperties();
+     // General device functions
+     bool Connect();
+     bool Disconnect();
+     const char *getDefaultName();
+     bool initProperties();
+     bool updateProperties();
 
-    // CCD specific functions
-    bool StartExposure(float duration);
-    bool AbortExposure();
-    int SetTemperature(double temperature);
-    void TimerHit();
+     // CCD specific functions
+     bool StartExposure ( float duration );
+     bool AbortExposure();
+     int SetTemperature ( double temperature );
+     void TimerHit();
 
 private:
-    // Utility functions
-    float CalcTimeLeft();
-    void  setupParams();
-    void  grabImage();
+     // Utility functions
+     float CalcTimeLeft();
+     void  setupParams();
+     void  grabImage();
 
-    // Are we exposing?
-    bool InExposure;
-    // Struct to keep timing
-    struct timeval ExpStart;
+     // Are we exposing?
+     bool InExposure;
+     // Struct to keep timing
+     struct timeval ExpStart;
 
-    INumber GainN[1];
-    INumberVectorProperty GainNP;
+     INumber GainN[1];
+     INumberVectorProperty GainNP;
 
-    INumber OffsetN[1];
-    INumberVectorProperty OffsetNP;
+     INumber OffsetN[1];
+     INumberVectorProperty OffsetNP;
 
-    INumber BaudrateN[1];
-    INumberVectorProperty BaudrateNP;
+     INumber BaudrateN[1];
+     INumberVectorProperty BaudrateNP;
 
-    float ExposureRequest;
-    float TemperatureRequest;
-    int   timerID;
+     INumber BaudrateAN[1];
+     INumberVectorProperty BaudrateANP;
+
+     INumber BaudrateBN[1];
+     INumberVectorProperty BaudrateBNP;
+     
+     float ExposureRequest;
+     float TemperatureRequest;
+     int   timerID;
 
 };
 

@@ -89,166 +89,194 @@ Fortunately Programnyj driver buffer it allows (in the program up to 24 MB!) To 
 
 int ftdi_read_data_modified ( struct  ftdi_context * ftdi, unsigned char * buf, int size )
 {
-  int rsize = ftdi_read_data ( ftdi, buf, size );
-  int nsize=size-rsize;
-  int retry=0;
-  while ( ( nsize>0 ) & ( retry<1000 ) )
-    {
-      retry++;
-      usleep ( 10000 );
-      fprintf ( stderr,"Try %d since %d<>%d \n",retry, rsize,size );
-      rsize = rsize+ftdi_read_data ( ftdi, buf+rsize, nsize );
-      nsize = size - rsize;
-    }
-  return rsize;
+     int rsize = ftdi_read_data ( ftdi, buf, size );
+     int nsize=size-rsize;
+     int retry=0;
+     while ( ( nsize>0 ) & ( retry<500) ) {
+          retry++;
+          usleep ( 1000*1 );
+          fprintf ( stderr,"Try %d since %d<>%d \n",retry, rsize,size );
+          rsize = rsize+ftdi_read_data ( ftdi, buf+rsize, nsize );
+          nsize = size - rsize;
+     }
+     return rsize;
 }
 
-void sspi(void)
+void sspi ( void )
 {
-	//fprintf(stderr,"--sspi\n");
-	int i,j;
-	uint8_t b;
-	uint16_t n;
-	
-	n = 100;
-	memset(FT_Out_Buffer,portfirst,n);
-	for (j = 0; j <= 2; j++)
-	{
-		b=siin[j];
-		for (i = 0; i <= 7; i++)
-		{
-			FT_Out_Buffer[2*i+1+16*j]+=0x20;
-			if (((b & 0x80)==0x80))
-			{
-				FT_Out_Buffer[2*i+16*j]+=0x80;
-				FT_Out_Buffer[2*i+1+16*j]+=0x80;
-			}
-			b=b*2;
-		}
-	}
-	if (ftdi_write_data(CAM8B, FT_Out_Buffer, n) < 0 ) fprintf(stderr,"write failed on channel B)\n");
+     //fprintf(stderr,"--sspi\n");
+     int i,j;
+     uint8_t b;
+     uint16_t n;
+
+     n = 100;
+     memset ( FT_Out_Buffer,portfirst,n );
+     for ( j = 0; j <= 2; j++ ) {
+          b=siin[j];
+          for ( i = 0; i <= 7; i++ ) {
+               FT_Out_Buffer[2*i+1+16*j]+=0x20;
+               if ( ( ( b & 0x80 ) ==0x80 ) ) {
+                    FT_Out_Buffer[2*i+16*j]+=0x80;
+                    FT_Out_Buffer[2*i+1+16*j]+=0x80;
+               }
+               b=b*2;
+          }
+     }
+     if ( ftdi_write_data ( CAM8B, FT_Out_Buffer, n ) < 0 ) fprintf ( stderr,"write failed on channel B)\n" );
 }
 
-void sspo(void)
+void sspo ( void )
 {
-	//fprintf(stderr,"--sspo\n");
-	int i;
-	uint16_t b;
-	uint16_t n;
-	uint16_t buf;
-	
-	n=100;
-	dwBytesRead=ftdi_read_data_modified(CAM8B,FT_In_Buffer,n);
-	//fprintf ( stderr,"--sspo dwBytesRead (%d)\n",dwBytesRead);	
-	b=0;
-	for (i = 0; i <= 15; i++)
-	{
-		b=b*2;
-		buf=(256*FT_In_Buffer[2*(i+1+8)]+FT_In_Buffer[2*(i+1+8)+1]);
-		if (((   buf & 0x40    ) != 0x00)) b++;
-	}
-	siout=b;
-	//fprintf ( stderr,"--sspo siout (%04X)\n",siout);
+     //fprintf(stderr,"--sspo\n");
+     int i;
+     uint16_t b;
+     uint16_t n;
+     uint16_t buf;
+
+     n=100;
+     dwBytesRead=ftdi_read_data_modified ( CAM8B,FT_In_Buffer,n );
+     //fprintf ( stderr,"--sspo dwBytesRead (%d)\n",dwBytesRead);
+     b=0;
+     for ( i = 0; i <= 15; i++ ) {
+          b=b*2;
+          buf= ( 256*FT_In_Buffer[2* ( i+1+8 )]+FT_In_Buffer[2* ( i+1+8 ) +1] );
+          if ( ( ( buf & 0x40 ) != 0x00 ) ) b++;
+     }
+     siout=b;
+     //fprintf ( stderr,"--sspo siout (%04X)\n",siout);
 
 }
 
-void Spi_comm(uint8_t comm, uint16_t param)
+void Spi_comm ( uint8_t comm, uint16_t param )
 {
-	//fprintf(stderr,"--Spi_comm\n");
-	fprintf ( stderr,"--Spi_comm param (%04X) comm (%02X)\n",param,comm );
-	ftdi_usb_purge_rx_buffer(CAM8B);
-	ftdi_usb_purge_tx_buffer(CAM8B);
-	siin[0]=comm;
-	siin[1]=(param & 0xFF00) >> 8;
-	siin[2]=(param & 0x00FF);
-	sspi();
-	sspo();
-    usleep(20*1000);	
+     //fprintf(stderr,"--Spi_comm\n");
+     fprintf ( stderr,"--Spi_comm param (%04X) comm (%02X)\n",param,comm );
+     ftdi_usb_purge_rx_buffer ( CAM8B );
+     ftdi_usb_purge_tx_buffer ( CAM8B );
+     siin[0]=comm;
+     siin[1]= ( param & 0xFF00 ) >> 8;
+     siin[2]= ( param & 0x00FF );
+     sspi();
+     sspo();
+     usleep ( 20*1000 );
 }
 
-uint16_t swap(uint16_t x)
+uint16_t swap ( uint16_t x )
 {
-        uint16_t ret;
-        uint8_t hibyte = (x & 0xFF00) >> 8;
-        uint8_t lobyte = (x & 0x00FF);
-        ret=  (lobyte << 8) | hibyte;
-        return ret;
+     uint16_t ret;
+     uint8_t hibyte = ( x & 0xFF00 ) >> 8;
+     uint8_t lobyte = ( x & 0x00FF );
+     ret= ( lobyte << 8 ) | hibyte;
+     return ret;
 }
 
 /*Contraption FT2232HL converting the read buffer to the buffer array image
    due to the nature AD9822 read the high byte first, then low, and vice versa in delphi.
    Use the type integer32, instead word16 due to overflow in subsequent operations*/
-void *posExecute(void *arg) // Array itself actually reading through ADBUS port
+void *posExecute ( void *arg ) // Array itself actually reading through ADBUS port
 {
-	fprintf(stderr,"--posExecute\n");
-	uint16_t x,y;
-	dwBytesRead=ftdi_read_data_modified(CAM8A,FT_In_Buffer,kolbyte);
-    if (mBin == 0) 
-    {
-		for (y=0; y <= mdeltY-1; y++)
-		{
-			for( x=0; x <= 1499; x++)
-			{
-				bufim[2*x+0][(2*(y+mYn)+0)*1]=(FT_In_Buffer[2*(4*x+4+y*6004)])+256*(FT_In_Buffer[2*(4*x+4+y*6004)+1]);
-				bufim[2*x+0][(2*(y+mYn)+1)*1]=(FT_In_Buffer[2*(4*x+5+y*6004)])+256*(FT_In_Buffer[2*(4*x+5+y*6004)+1]);
-				bufim[2*x+1][(2*(y+mYn)+1)*1]=(FT_In_Buffer[2*(4*x+6+y*6004)])+256*(FT_In_Buffer[2*(4*x+6+y*6004)+1]);
-				bufim[2*x+1][(2*(y+mYn)+0)*1]=(FT_In_Buffer[2*(4*x+7+y*6004)])+256*(FT_In_Buffer[2*(4*x+7+y*6004)+1]);
-			}
-			
-		}
-    }
-    else 
-	{
-		for (y=0; y <= mdeltY-1; y++)
-		{
-			for( x=0; x <= 1498; x++)
-			{
-				bufim[2*x+0][(2*(y+mYn)+0)*3000]=swap(FT_In_Buffer[x+7+y*1504]);
-				bufim[2*x+0][(2*(y+mYn)+1)*3000]=swap(FT_In_Buffer[x+7+y*1504]);
-				bufim[2*x+1][(2*(y+mYn)+1)*3000]=swap(FT_In_Buffer[x+7+y*1504]);
-				bufim[2*x+1][(2*(y+mYn)+0)*3000]=swap(FT_In_Buffer[x+7+y*1504]);
-			}
-			x=1499;
-			bufim[2*x+0][(2*(y+mYn)+0)*3000]=swap(FT_In_Buffer[x+6+y*1504]);
-			bufim[2*x+0][(2*(y+mYn)+1)*3000]=swap(FT_In_Buffer[x+6+y*1504]);
-			bufim[2*x+1][(2*(y+mYn)+1)*3000]=swap(FT_In_Buffer[x+6+y*1504]);
-			bufim[2*x+1][(2*(y+mYn)+0)*3000]=swap(FT_In_Buffer[x+6+y*1504]);
-		}
-    }
-	mCameraState =0;
-	mImageReady = true;
-	
-	(void) arg;
-	pthread_exit(NULL);
+     fprintf ( stderr,"--posExecute\n" );
+     uint16_t x,y;
+     dwBytesRead=ftdi_read_data_modified ( CAM8A,FT_In_Buffer,kolbyte );
+     if ( mBin == 0 ) {
+          for ( y=0; y <= mdeltY-1; y++ ) {
+               for ( x=0; x <= 1499; x++ ) {
+                    bufim[2*x+0][ ( 2* ( y+mYn ) +0 ) *1]= ( FT_In_Buffer[2* ( 4*x+4+y*6004 )] ) +256* ( FT_In_Buffer[2* ( 4*x+4+y*6004 ) +1] );
+                    bufim[2*x+0][ ( 2* ( y+mYn ) +1 ) *1]= ( FT_In_Buffer[2* ( 4*x+5+y*6004 )] ) +256* ( FT_In_Buffer[2* ( 4*x+5+y*6004 ) +1] );
+                    bufim[2*x+1][ ( 2* ( y+mYn ) +1 ) *1]= ( FT_In_Buffer[2* ( 4*x+6+y*6004 )] ) +256* ( FT_In_Buffer[2* ( 4*x+6+y*6004 ) +1] );
+                    bufim[2*x+1][ ( 2* ( y+mYn ) +0 ) *1]= ( FT_In_Buffer[2* ( 4*x+7+y*6004 )] ) +256* ( FT_In_Buffer[2* ( 4*x+7+y*6004 ) +1] );
+               }
+
+          }
+     } else {
+          for ( y=0; y <= mdeltY-1; y++ ) {
+               for ( x=0; x <= 1498; x++ ) {
+                    bufim[2*x+0][ ( 2* ( y+mYn ) +0 )]= FT_In_Buffer[2*(x+7+y*1504)] + 256*FT_In_Buffer[2*(x+7+y*1504)+1];
+                    bufim[2*x+0][ ( 2* ( y+mYn ) +1 )]= FT_In_Buffer[2*(x+7+y*1504)] + 256*FT_In_Buffer[2*(x+7+y*1504)+1] ;
+                    bufim[2*x+1][ ( 2* ( y+mYn ) +1 )]= FT_In_Buffer[2*(x+7+y*1504)] + 256*FT_In_Buffer[2*(x+7+y*1504)+1] ;
+                    bufim[2*x+1][ ( 2* ( y+mYn ) +0 )]= FT_In_Buffer[2*(x+7+y*1504)] + 256*FT_In_Buffer[2*(x+7+y*1504)+1] ;
+               }
+               x=1499;
+               bufim[2*x+0][ ( 2* ( y+mYn ) +0 )]=FT_In_Buffer[2*(x+6+y*1504)] + 256*FT_In_Buffer[2*(x+6+y*1504)+1] ;
+               bufim[2*x+0][ ( 2* ( y+mYn ) +1 )]=FT_In_Buffer[2*(x+6+y*1504)] + 256*FT_In_Buffer[2*(x+6+y*1504)+1] ;
+               bufim[2*x+1][ ( 2* ( y+mYn ) +1 )]=FT_In_Buffer[2*(x+6+y*1504)] + 256*FT_In_Buffer[2*(x+6+y*1504)+1] ;
+               bufim[2*x+1][ ( 2* ( y+mYn ) +0 )]=FT_In_Buffer[2*(x+6+y*1504)] + 256*FT_In_Buffer[2*(x+6+y*1504)+1] ;
+          }
+     }
+     mCameraState =0;
+     mImageReady = true;
+
+     ( void ) arg;
+     pthread_exit ( NULL );
 }
 
 /*Filling the output buffer array for transmission and placing byte val at the address adr-chip AD9822.
   The transfer is in sequential code.*/
-void AD9822(uint8_t adr,uint16_t val)
+void AD9822 ( uint8_t adr,uint16_t val )
 {
-	fprintf(stderr,"--AD9822\n");
-	int kol = 64;
-	uint8_t dan[kol];
-	int i;
-	memset(dan,portfirst,kol);
-    for (i = 1; i <= 32; i++)  { dan[i]=dan[i] & 0xFE;          };
-    for (i = 0; i <= 15; i++)  { dan[2*i+2]=dan[2*i+2] +2 ;      };
+     fprintf ( stderr,"--AD9822\n" );
+     int kol = 64;
+     uint8_t dan[kol];
+     int i;
+     memset ( dan,portfirst,kol );
+     for ( i = 1; i <= 32; i++ )  {
+          dan[i]=dan[i] & 0xFE;
+     };
+     for ( i = 0; i <= 15; i++ )  {
+          dan[2*i+2]=dan[2*i+2] +2 ;
+     };
 
-    if ((adr & 4)==4)       { dan[3] =dan[3]+4;     dan[4] =dan[4]+4;  };
-    if ((adr & 2)==2)       { dan[5] =dan[5]+4;     dan[6] =dan[6]+4;  };
-    if ((adr & 1)==1)       { dan[7] =dan[7]+4;     dan[8] =dan[8]+4;  };
+     if ( ( adr & 4 ) ==4 )       {
+          dan[3] =dan[3]+4;
+          dan[4] =dan[4]+4;
+     };
+     if ( ( adr & 2 ) ==2 )       {
+          dan[5] =dan[5]+4;
+          dan[6] =dan[6]+4;
+     };
+     if ( ( adr & 1 ) ==1 )       {
+          dan[7] =dan[7]+4;
+          dan[8] =dan[8]+4;
+     };
 
-    if ((val & 256)==256)   { dan[15]=dan[15]+4;    dan[16]=dan[16]+4; };
-    if ((val & 128)==128)   { dan[17]=dan[17]+4;    dan[18]=dan[18]+4; };
-    if ((val &  64)==64)    { dan[19]=dan[19]+4;    dan[20]=dan[20]+4; };
-    if ((val &  32)==32)    { dan[21]=dan[21]+4;    dan[22]=dan[22]+4; };
-    if ((val &  16)==16)    { dan[23]=dan[23]+4;    dan[24]=dan[24]+4; };
-    if ((val &   8)==8)     { dan[25]=dan[25]+4;    dan[26]=dan[26]+4; };
-    if ((val &   4)==4)     { dan[27]=dan[27]+4;    dan[28]=dan[28]+4; };
-    if ((val &   2)==2)     { dan[29]=dan[29]+4;    dan[30]=dan[30]+4; };
-    if ((val &   1)==1)     { dan[31]=dan[31]+4;    dan[32]=dan[32]+4; };
+     if ( ( val & 256 ) ==256 )   {
+          dan[15]=dan[15]+4;
+          dan[16]=dan[16]+4;
+     };
+     if ( ( val & 128 ) ==128 )   {
+          dan[17]=dan[17]+4;
+          dan[18]=dan[18]+4;
+     };
+     if ( ( val &  64 ) ==64 )    {
+          dan[19]=dan[19]+4;
+          dan[20]=dan[20]+4;
+     };
+     if ( ( val &  32 ) ==32 )    {
+          dan[21]=dan[21]+4;
+          dan[22]=dan[22]+4;
+     };
+     if ( ( val &  16 ) ==16 )    {
+          dan[23]=dan[23]+4;
+          dan[24]=dan[24]+4;
+     };
+     if ( ( val &   8 ) ==8 )     {
+          dan[25]=dan[25]+4;
+          dan[26]=dan[26]+4;
+     };
+     if ( ( val &   4 ) ==4 )     {
+          dan[27]=dan[27]+4;
+          dan[28]=dan[28]+4;
+     };
+     if ( ( val &   2 ) ==2 )     {
+          dan[29]=dan[29]+4;
+          dan[30]=dan[30]+4;
+     };
+     if ( ( val &   1 ) ==1 )     {
+          dan[31]=dan[31]+4;
+          dan[32]=dan[32]+4;
+     };
 
-    if (  ftdi_write_data(CAM8B, dan, sizeof(dan)) < 0 ) fprintf(stderr,"write failed on channel B)\n");
+     if ( ftdi_write_data ( CAM8B, dan, sizeof ( dan ) ) < 0 ) fprintf ( stderr,"write failed on channel B)\n" );
 }
 
 /*Use 2 modes:
@@ -259,269 +287,272 @@ void AD9822(uint8_t adr,uint16_t val)
   so the number of rows for the two modes are similar.*/
 
 //Filling the output buffer array and the actual frame itself in the read operation mode 1
-void readframe(void)
+void readframe ( void )
 {
-	fprintf(stderr,"--readframe\n");
+     fprintf ( stderr,"--readframe\n" );
 
 
-	mCameraState = 2;
-	mImageReady = false;
-	ftdi_usb_purge_rx_buffer(CAM8A);
-	//comread();
-	pthread_t t1;
-	pthread_create(&t1, NULL, posExecute, NULL);
-	Spi_comm(0x1B,0);//$ffff
-	//pthread_detach ( t1 );
-	pthread_join ( t1,NULL );
+     mCameraState = 2;
+     mImageReady = false;
+     ftdi_usb_purge_rx_buffer ( CAM8A );
+     usleep(1000*1000);
+     //comread();
+
+     pthread_t t1;
+     pthread_create ( &t1, NULL, posExecute, NULL );
+     Spi_comm ( 0x1B,0 ); //$ffff
+     //pthread_detach ( t1 );
+     pthread_join ( t1,NULL );
 }
 
 /*Set camera gain, return bool result*/
-bool cameraSetGain (int val)
+bool cameraSetGain ( int val )
 {
-	AD9822(3,val);
-	return true;
+     AD9822 ( 3,val );
+     return true;
 }
 
 /*Set camera offset, return bool result*/
-bool cameraSetOffset (int val)
+bool cameraSetOffset ( int val )
 {
-	int x;
-	
-	x=abs(2*val);
-	if (val < 0)  x=x+256;
-	AD9822(6,x);
-	return true;
+     int x;
+
+     x=abs ( 2*val );
+     if ( val < 0 )  x=x+256;
+     AD9822 ( 6,x );
+     return true;
 }
 
 /*Connect camera, return bool result}
 Survey attached devices and initialize AD9822*/
 bool cameraConnect()
 {
-	fprintf(stderr,"--cameraConnect\n");
+     fprintf ( stderr,"--cameraConnect\n" );
 
-    FT_OP_flag = true;
-    CAM8A = ftdi_new();
-    CAM8B = ftdi_new();
-    if (ftdi_set_interface(CAM8A, INTERFACE_A)<0) fprintf(stderr,"libftdi error set interface A\n");
-    if (ftdi_set_interface(CAM8B, INTERFACE_B)<0) fprintf(stderr,"libftdi error set interface B\n");
-	if (ftdi_usb_open(CAM8A, 0x0403, 0x6010)<0) fprintf(stderr,"libftdi error open interface A\n");
-	if (ftdi_usb_open(CAM8B, 0x0403, 0x6010)<0) fprintf(stderr,"libftdi error open interface B\n");
+     FT_OP_flag = true;
+     CAM8A = ftdi_new();
+     CAM8B = ftdi_new();
+     if ( ftdi_set_interface ( CAM8A, INTERFACE_A ) <0 ) fprintf ( stderr,"libftdi error set interface A\n" );
+     if ( ftdi_set_interface ( CAM8B, INTERFACE_B ) <0 ) fprintf ( stderr,"libftdi error set interface B\n" );
+     if ( ftdi_usb_open ( CAM8A, 0x0403, 0x6010 ) <0 ) fprintf ( stderr,"libftdi error open interface A\n" );
+     if ( ftdi_usb_open ( CAM8B, 0x0403, 0x6010 ) <0 ) fprintf ( stderr,"libftdi error open interface B\n" );
 
 // BitBang channel 2
-    if (ftdi_set_bitmode(CAM8B, 0xBF, BITMODE_SYNCBB    )<0) fprintf(stderr,"libftdi error set bitbang mode interface B\n");
-    //BITMODE_BITBANG / BITMODE_SYNCBB
+     if ( ftdi_set_bitmode ( CAM8B, 0xBF, BITMODE_SYNCBB ) <0 ) fprintf ( stderr,"libftdi error set bitbang mode interface B\n" );
+     //BITMODE_BITBANG / BITMODE_SYNCBB
 
 // Baudrate
-//    cameraSetBaudrate(40);
-      FT_Current_Baud = spusb/4;
-//      ftdi_result=ftdi_set_baudrate ( CAM8A,FT_Current_Baud );
-      ftdi_result=ftdi_set_baudrate ( CAM8B,20000/4 );
-      if ( ftdi_result<0 )
-        {
-          fprintf ( stderr,"libftdi error set baud interface B (%d:%s)\n",ftdi_result,ftdi_get_error_string ( CAM8A ) );
-        }
-    if (ftdi_set_latency_timer(CAM8A,2)<0) fprintf(stderr,"libftdi error set latency interface A\n");
-    if (ftdi_set_latency_timer(CAM8B,1)<0) fprintf(stderr,"libftdi error set latency interface B\n");;
+     cameraSetBaudrateA(BRA);
+     cameraSetBaudrateB(BRB);     
+
+     if ( ftdi_set_latency_timer ( CAM8A,10 ) <0 ) fprintf ( stderr,"libftdi error set latency interface A\n" );
+     if ( ftdi_set_latency_timer ( CAM8B,10 ) <0 ) fprintf ( stderr,"libftdi error set latency interface B\n" );;
 
 //timeouts
-    CAM8A->usb_read_timeout=3000;
-    CAM8B->usb_read_timeout=100;
-    CAM8A->usb_write_timeout=100;
-    CAM8B->usb_write_timeout=100;
+     CAM8A->usb_read_timeout=30000;
+     CAM8B->usb_read_timeout=10000;
+     CAM8A->usb_write_timeout=10000;
+     CAM8B->usb_write_timeout=10000;
 
-    fprintf ( stderr,"libftdi BRA=%d BRB=%d TA=%d TB=%d\n",CAM8A->baudrate,CAM8B->baudrate,CAM8A->usb_read_timeout,CAM8B->usb_write_timeout );
+     fprintf ( stderr,"libftdi BRA=%d BRB=%d TA=%d TB=%d\n",CAM8A->baudrate,CAM8B->baudrate,CAM8A->usb_read_timeout,CAM8B->usb_write_timeout );
 
 //Purge
-	if (ftdi_usb_purge_rx_buffer(CAM8A)<0) fprintf(stderr,"libftdi error purge RX interface A\n");
-	if (ftdi_usb_purge_tx_buffer(CAM8A)<0) fprintf(stderr,"libftdi error purge TX interface A\n");
-	if (ftdi_usb_purge_rx_buffer(CAM8B)<0) fprintf(stderr,"libftdi error purge RX interface B\n");
-	if (ftdi_usb_purge_tx_buffer(CAM8B)<0) fprintf(stderr,"libftdi error purge TX interface B\n");
+     if ( ftdi_usb_purge_rx_buffer ( CAM8A ) <0 ) fprintf ( stderr,"libftdi error purge RX interface A\n" );
+     if ( ftdi_usb_purge_tx_buffer ( CAM8A ) <0 ) fprintf ( stderr,"libftdi error purge TX interface A\n" );
+     if ( ftdi_usb_purge_rx_buffer ( CAM8B ) <0 ) fprintf ( stderr,"libftdi error purge RX interface B\n" );
+     if ( ftdi_usb_purge_tx_buffer ( CAM8B ) <0 ) fprintf ( stderr,"libftdi error purge TX interface B\n" );
 
-	adress =0;
-	
-    AD9822(0,0xD8);
-    AD9822(1,0xA0);
-	
-    cameraSetGain(0);         // Set a gain. that is not full of ADC
-    cameraSetOffset(0);
+     adress =0;
 
-	memset(FT_Out_Buffer,portfirst-0x10,200);	//reset pin = 0;
-    if (ftdi_write_data(CAM8B, FT_Out_Buffer, 200) < 0 ) fprintf(stderr,"write failed on channel B)\n");
-	memset(FT_Out_Buffer,portfirst,200);		//reset pin = 1;
-    if (ftdi_write_data(CAM8B, FT_Out_Buffer, 200) < 0 ) fprintf(stderr,"write failed on channel B)\n");
-	usleep(1000*500);
+     AD9822 ( 0,0xD8 );
+     AD9822 ( 1,0xA0 );
 
-	// Remove the 2 bytes that have arisen after the reset
-	if (ftdi_usb_purge_rx_buffer(CAM8A)<0) fprintf(stderr,"libftdi error purge RX interface A\n");
-	mBin=0;
+     cameraSetGain ( 0 );      // Set a gain. that is not full of ADC
+     cameraSetOffset ( 0 );
 
-	mCameraState=0;
-	//fprintf ( stderr,"gettemp (%" PRIu16 ")\n",CameraGetTemp() );
-	isConnected = true;
-	return isConnected;
+     memset ( FT_Out_Buffer,portfirst-0x10,200 );	//reset pin = 0;
+     if ( ftdi_write_data ( CAM8B, FT_Out_Buffer, 200 ) < 0 ) fprintf ( stderr,"write failed on channel B)\n" );
+     memset ( FT_Out_Buffer,portfirst,200 );		//reset pin = 1;
+     if ( ftdi_write_data ( CAM8B, FT_Out_Buffer, 200 ) < 0 ) fprintf ( stderr,"write failed on channel B)\n" );
+     usleep ( 1000*500 );
+
+     // Remove the 2 bytes that have arisen after the reset
+     if ( ftdi_usb_purge_rx_buffer ( CAM8A ) <0 ) fprintf ( stderr,"libftdi error purge RX interface A\n" );
+     mBin=0;
+
+     mCameraState=0;
+     //fprintf ( stderr,"gettemp (%" PRIu16 ")\n",CameraGetTemp() );
+     isConnected = true;
+     return isConnected;
 }
 
 /*Disconnect camera, return bool result*/
-bool cameraDisconnect(void)
+bool cameraDisconnect ( void )
 {
-    ftdi_disable_bitbang(CAM8B);
-    ftdi_usb_close(CAM8B);
-    ftdi_free(CAM8B);
-    ftdi_usb_close(CAM8A);
-    ftdi_free(CAM8A);
+     ftdi_disable_bitbang ( CAM8B );
+     ftdi_usb_close ( CAM8B );
+     ftdi_free ( CAM8B );
+     ftdi_usb_close ( CAM8A );
+     ftdi_free ( CAM8A );
 }
 
-void *ExposureTimerTick(void *arg)
+void *ExposureTimerTick ( void *arg )
 {
-	fprintf(stderr,"--ExposureTimerTick\n");
-	uint32_t dd;
-	dd = (durat*1000)*1000;
-	usleep(dd);
-	fprintf(stderr,"--ExposureTimerTick : Tick !\n");  
-	readframe();
-	(void) arg;
-	pthread_exit(NULL);
+     fprintf ( stderr,"--ExposureTimerTick\n" );
+     uint32_t dd;
+     dd = ( durat*1000 ) *1000;
+     usleep ( dd );
+     fprintf ( stderr,"--ExposureTimerTick : Tick !\n" );
+     readframe();
+     ( void ) arg;
+     pthread_exit ( NULL );
 }
 
 /*Check camera connection, return bool result*/
 bool cameraIsConnected()
 {
-  return isConnected;
+     return isConnected;
 }
 
-int cameraStartExposure (int bin,int StartX,int StartY,int NumX,int NumY, double Duration, bool light)
+int cameraStartExposure ( int bin,int StartX,int StartY,int NumX,int NumY, double Duration, bool light )
 {
-	fprintf ( stderr,"--cameraStartExposure bin %d x %d y %d w %d h %d s %f l %d\n",bin,StartX,StartY,NumX,NumY,Duration,light );
-	//fprintf ( stderr,"gettemp (%" PRIu16 ")\n",CameraGetTemp() );
-	uint8_t d0,d1;
-	int expoz;
-	pthread_t te;	
-	
-	mYn	= StartY / 2;
-	Spi_comm(0x4B,mYn);
-	mdeltY = NumY / 2;
-	Spi_comm(0x5B,mdeltY);
-	fprintf ( stderr,"--cameraStartExposure A1\n");
-	
-	mBin=bin;
-	if (bin==1) 
-	{
-		kolbyte=mdeltY*3008;
-		Spi_comm(0x8B,1);  //bining
-		mBin=1;
-	}
-	else
-	{
-		kolbyte=mdeltY*12008;
-		Spi_comm(0x8B,0);  //no bining
-		mBin=0;
-	}
-	fprintf ( stderr,"--cameraStartExposure A2\n");
-	expoz=Duration*1000;
-	durat=Duration;
-	if (expoz > 1000) expoz=1001;
-	Spi_comm(0x6B,expoz);
-	fprintf ( stderr,"--cameraStartExposure A3\n");
-	
-	mImageReady = false;
-	//camera exposing
-	mCameraState = 1;
+     fprintf ( stderr,"--cameraStartExposure bin %d x %d y %d w %d h %d s %f l %d\n",bin,StartX,StartY,NumX,NumY,Duration,light );
+     //fprintf ( stderr,"gettemp (%" PRIu16 ")\n",CameraGetTemp() );
+     uint8_t d0,d1;
+     int expoz;
+     pthread_t te;
 
-	if (Duration > 1.0 )
-	{
-		fprintf ( stderr,"--cameraStartExposure B1\n");
-		Spi_comm(0x2B,0); //shift3
-		usleep(40*1000);
-		Spi_comm(0xCB,0); //clear frame
-		usleep(180*1000); //for time of clear frame
-		Spi_comm(0x3B,0); //off 15v
-		eexp=(1000*(Duration-1.2));
-		pthread_create(&te, NULL, ExposureTimerTick, NULL);
-		pthread_detach ( te );
-	}
-	else
-	{
-		fprintf ( stderr,"--cameraStartExposure C1\n");
-		eexp=0;
-		readframe();
-	}
-	return true;
+     mYn	= StartY / 2;
+     Spi_comm ( 0x4B,mYn );
+     mdeltY = NumY / 2;
+     Spi_comm ( 0x5B,mdeltY );
+     fprintf ( stderr,"--cameraStartExposure A1\n" );
+
+     mBin=bin;
+     if ( bin==1 ) {
+          kolbyte=mdeltY*3008;
+          Spi_comm ( 0x8B,1 ); //bining
+          mBin=1;
+     } else {
+          kolbyte=mdeltY*12008;
+          Spi_comm ( 0x8B,0 ); //no bining
+          mBin=0;
+     }
+     fprintf ( stderr,"--cameraStartExposure A2\n" );
+     expoz=Duration*1000;
+     durat=Duration;
+     if ( expoz > 1000 ) expoz=1001;
+     Spi_comm ( 0x6B,expoz );
+     fprintf ( stderr,"--cameraStartExposure A3\n" );
+
+     mImageReady = false;
+     //camera exposing
+     mCameraState = 1;
+
+     if ( Duration > 1.0 ) {
+          fprintf ( stderr,"--cameraStartExposure B1\n" );
+          Spi_comm ( 0x2B,0 ); //shift3
+          usleep ( 40*1000 );
+          Spi_comm ( 0xCB,0 ); //clear frame
+          usleep ( 180*1000 ); //for time of clear frame
+          Spi_comm ( 0x3B,0 ); //off 15v
+          eexp= ( 1000* ( Duration-1.2 ) );
+          pthread_create ( &te, NULL, ExposureTimerTick, NULL );
+          pthread_detach ( te );
+     } else {
+          fprintf ( stderr,"--cameraStartExposure C1\n" );
+          eexp=0;
+          readframe();
+     }
+     return true;
 }
 
 /*Stop camera exposure when it is possible*/
 bool cameraStopExposure()
 {
-	// "code to kill Exposuretimer thread"
-	if (mCameraState==1) readframe();
-	return true;
+     // "code to kill Exposuretimer thread"
+     if ( mCameraState==1 ) readframe();
+     return true;
 }
 
-bool CameraSetTemp(int temp)
+bool CameraSetTemp ( int temp )
 {
-	uint8_t d0;
-	
-	d0=16*temp;
-	Spi_comm(0xAB,d0);
-	return true;	
+     uint8_t d0;
+
+     d0=16*temp;
+     Spi_comm ( 0xAB,d0 );
+     return true;
 }
 
-uint16_t CameraGetTemp(void)
+uint16_t CameraGetTemp ( void )
 {
-	fprintf ( stderr,"--CameraGetTemp\n");
-	Spi_comm(0xBF,0);
-	return siout;	
+     fprintf ( stderr,"--CameraGetTemp\n" );
+     Spi_comm ( 0xBF,0 );
+     return siout;
 }
 
-bool CameraCoolingOn(void)
+bool CameraCoolingOn ( void )
 {
-	Spi_comm(0x9B,1);
-	return true;	
+     Spi_comm ( 0x9B,1 );
+     return true;
 }
 
-bool CameraCoolingOff(void)
+bool CameraCoolingOff ( void )
 {
-	Spi_comm(0x9B,0);
-	return true;	
+     Spi_comm ( 0x9B,0 );
+     return true;
 }
 
-uint16_t cameraGetImage(int i,int j)
+uint16_t cameraGetImage ( int i,int j )
 {
-  return bufim[i][j];
+     return bufim[i][j];
 }
 
 /*Check ImageReady flag, is image ready for transfer - transfer image to driver and return bool ImageReady flag*/
 bool cameraGetImageReady()
 {
-  return mImageReady;
+     return mImageReady;
 }
 
 /*Set camera baudrate, return bool result*/
-bool cameraSetBaudrate ( int val )                /*stdcall; export;*/
+bool cameraSetBaudrate ( int val )
 {
-  bool Result;
-  /*setup FT2232 baud rate*/
-  if ( ( val>=1 ) & ( val<=150 ) )
-    {
-      spusb = val*1000;
-      ms1 = spusb / 8000;
-      FT_Current_Baud = spusb;
-      ftdi_result=ftdi_set_baudrate ( CAM8A,FT_Current_Baud );
-      if ( ftdi_result<0 )
-        {
-          fprintf ( stderr,"libftdi error set baud interface A (%d:%s)\n",ftdi_result,ftdi_get_error_string ( CAM8A ) );
-        }
-      ftdi_result=ftdi_set_baudrate ( CAM8B,FT_Current_Baud/4);
-      if ( ftdi_result<0 )
-        {
-          fprintf ( stderr,"libftdi error set baud interface B (%d:%s)\n",ftdi_result,ftdi_get_error_string ( CAM8B ) );
-        }
-      fprintf ( stderr,"libftdi BRA=%d BRB=%d TA=%d TB=%d\n",CAM8A->baudrate,CAM8B->baudrate,CAM8A->usb_read_timeout,CAM8B->usb_write_timeout );
-      fprintf ( stderr,"gettemp (%f)\n",(float)CameraGetTemp()/80);
-      Result = true;
-    }
-  else
-    {
-      Result = false;
-    }
-  return Result;
+     fprintf ( stderr,"gettemp (%f)\n", ( float ) CameraGetTemp() /80 );
+     return true;
 }
+
+bool cameraSetBaudrateA ( int val )
+{
+     bool Result;
+     /*setup FT2232 baud rate channel B*/
+     if ( ( val>=1 ) & ( val<=150 ) ) {
+	  ftdi_result=ftdi_set_baudrate ( CAM8A,val*1000 );
+          if ( ftdi_result<0 ) {
+               fprintf ( stderr,"libftdi error set baud interface A (%d:%s)\n",ftdi_result,ftdi_get_error_string ( CAM8A ) );
+          }
+          fprintf ( stderr,"libftdi BRA=%d WTA=%d RTA=%d\n",CAM8A->baudrate,CAM8A->usb_write_timeout,CAM8A->usb_read_timeout  );
+          Result = true;
+     } else {
+          Result = false;
+     }
+     return Result;
+
+}
+
+bool cameraSetBaudrateB ( int val )
+{
+     bool Result;
+     /*setup FT2232 baud rate channel B*/
+     if ( ( val>=1 ) & ( val<=150 ) ) {
+	  ftdi_result=ftdi_set_baudrate ( CAM8B,val*1000/4 );
+          if ( ftdi_result<0 ) {
+               fprintf ( stderr,"libftdi error set baud interface B (%d:%s)\n",ftdi_result,ftdi_get_error_string ( CAM8B ) );
+          }
+          fprintf ( stderr,"libftdi BRB=%d WTB=%d RTB=%d\n",CAM8B->baudrate,CAM8B->usb_write_timeout,CAM8B->usb_read_timeout  );
+          Result = true;
+     } else {
+          Result = false;
+     }
+     return Result;
+}
+

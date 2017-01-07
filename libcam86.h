@@ -26,6 +26,10 @@
 
 #define BRA 20
 #define BRB 5
+#define CAM86_LATENCYA  1
+#define CAM86_LATENCYB  1
+#define CAM86_TIMERA    300
+#define CAM86_TIMERB    100
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,7 +50,12 @@ uint16_t cameraGetImage ( int i, int j );
 bool cameraSetBaudrate ( int val );
 bool cameraSetBaudrateA ( int val );
 bool cameraSetBaudrateB ( int val );
-
+bool cameraSetLibftdiTimerAR ( int tt );
+bool cameraSetLibftdiTimerAW ( int tt );
+bool cameraSetLibftdiTimerBR ( int tt );
+bool cameraSetLibftdiTimerBW ( int tt );
+bool cameraSetLibftdiLatA ( int ll );
+bool cameraSetLibftdiLatB ( int ll );
 
 #ifdef __cplusplus
 }

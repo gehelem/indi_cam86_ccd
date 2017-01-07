@@ -92,7 +92,7 @@ int ftdi_read_data_modified ( struct  ftdi_context * ftdi, unsigned char * buf, 
      int rsize = ftdi_read_data ( ftdi, buf, size );
      int nsize=size-rsize;
      int retry=0;
-     while ( ( nsize>0 ) & ( retry<2000) ) {
+     while ( ( nsize>0 ) & ( retry<2000 ) ) {
           retry++;
           usleep ( 1000*1 );
           fprintf ( stderr,"Try %d since %d<>%d \n",retry, rsize,size );
@@ -191,16 +191,16 @@ void *posExecute ( void *arg ) // Array itself actually reading through ADBUS po
      } else {
           for ( y=0; y <= mdeltY-1; y++ ) {
                for ( x=0; x <= 1498; x++ ) {
-                    bufim[2*x+0][ ( 2* ( y+mYn ) +0 )]= FT_In_Buffer[2*(x+7+y*1504)] + 256*FT_In_Buffer[2*(x+7+y*1504)+1];
-                    bufim[2*x+0][ ( 2* ( y+mYn ) +1 )]= FT_In_Buffer[2*(x+7+y*1504)] + 256*FT_In_Buffer[2*(x+7+y*1504)+1] ;
-                    bufim[2*x+1][ ( 2* ( y+mYn ) +1 )]= FT_In_Buffer[2*(x+7+y*1504)] + 256*FT_In_Buffer[2*(x+7+y*1504)+1] ;
-                    bufim[2*x+1][ ( 2* ( y+mYn ) +0 )]= FT_In_Buffer[2*(x+7+y*1504)] + 256*FT_In_Buffer[2*(x+7+y*1504)+1] ;
+                    bufim[2*x+0][ ( 2* ( y+mYn ) +0 )]= FT_In_Buffer[2* ( x+7+y*1504 )] + 256*FT_In_Buffer[2* ( x+7+y*1504 ) +1];
+                    bufim[2*x+0][ ( 2* ( y+mYn ) +1 )]= FT_In_Buffer[2* ( x+7+y*1504 )] + 256*FT_In_Buffer[2* ( x+7+y*1504 ) +1] ;
+                    bufim[2*x+1][ ( 2* ( y+mYn ) +1 )]= FT_In_Buffer[2* ( x+7+y*1504 )] + 256*FT_In_Buffer[2* ( x+7+y*1504 ) +1] ;
+                    bufim[2*x+1][ ( 2* ( y+mYn ) +0 )]= FT_In_Buffer[2* ( x+7+y*1504 )] + 256*FT_In_Buffer[2* ( x+7+y*1504 ) +1] ;
                }
                x=1499;
-               bufim[2*x+0][ ( 2* ( y+mYn ) +0 )]=FT_In_Buffer[2*(x+6+y*1504)] + 256*FT_In_Buffer[2*(x+6+y*1504)+1] ;
-               bufim[2*x+0][ ( 2* ( y+mYn ) +1 )]=FT_In_Buffer[2*(x+6+y*1504)] + 256*FT_In_Buffer[2*(x+6+y*1504)+1] ;
-               bufim[2*x+1][ ( 2* ( y+mYn ) +1 )]=FT_In_Buffer[2*(x+6+y*1504)] + 256*FT_In_Buffer[2*(x+6+y*1504)+1] ;
-               bufim[2*x+1][ ( 2* ( y+mYn ) +0 )]=FT_In_Buffer[2*(x+6+y*1504)] + 256*FT_In_Buffer[2*(x+6+y*1504)+1] ;
+               bufim[2*x+0][ ( 2* ( y+mYn ) +0 )]=FT_In_Buffer[2* ( x+6+y*1504 )] + 256*FT_In_Buffer[2* ( x+6+y*1504 ) +1] ;
+               bufim[2*x+0][ ( 2* ( y+mYn ) +1 )]=FT_In_Buffer[2* ( x+6+y*1504 )] + 256*FT_In_Buffer[2* ( x+6+y*1504 ) +1] ;
+               bufim[2*x+1][ ( 2* ( y+mYn ) +1 )]=FT_In_Buffer[2* ( x+6+y*1504 )] + 256*FT_In_Buffer[2* ( x+6+y*1504 ) +1] ;
+               bufim[2*x+1][ ( 2* ( y+mYn ) +0 )]=FT_In_Buffer[2* ( x+6+y*1504 )] + 256*FT_In_Buffer[2* ( x+6+y*1504 ) +1] ;
           }
      }
      mCameraState =0;
@@ -295,7 +295,7 @@ void readframe ( void )
      mCameraState = 2;
      mImageReady = false;
      ftdi_usb_purge_rx_buffer ( CAM8A );
-     usleep(1000*1000);
+     usleep ( 1000*1000 );
      //comread();
 
      pthread_t t1;
@@ -303,7 +303,7 @@ void readframe ( void )
      Spi_comm ( 0x1B,0 ); //$ffff
      //pthread_detach ( t1 );
      pthread_join ( t1,NULL );
-     fprintf ( stderr,"--readframe -- Done !\n" );     
+     fprintf ( stderr,"--readframe -- Done !\n" );
 }
 
 /*Set camera gain, return bool result*/
@@ -343,8 +343,8 @@ bool cameraConnect()
      //BITMODE_BITBANG / BITMODE_SYNCBB
 
 // Baudrate
-     cameraSetBaudrateA(BRA);
-     cameraSetBaudrateB(BRB);     
+     cameraSetBaudrateA ( BRA );
+     cameraSetBaudrateB ( BRB );
 
      if ( ftdi_set_latency_timer ( CAM8A,1 ) <0 ) fprintf ( stderr,"libftdi error set latency interface A\n" );
      if ( ftdi_set_latency_timer ( CAM8B,1 ) <0 ) fprintf ( stderr,"libftdi error set latency interface B\n" );;
@@ -527,11 +527,11 @@ bool cameraSetBaudrateA ( int val )
      bool Result;
      /*setup FT2232 baud rate channel B*/
      if ( ( val>=1 ) & ( val<=150 ) ) {
-	  ftdi_result=ftdi_set_baudrate ( CAM8A,val*1000 );
+          ftdi_result=ftdi_set_baudrate ( CAM8A,val*1000 );
           if ( ftdi_result<0 ) {
                fprintf ( stderr,"libftdi error set baud interface A (%d:%s)\n",ftdi_result,ftdi_get_error_string ( CAM8A ) );
           }
-          fprintf ( stderr,"libftdi BRA=%d WTA=%d RTA=%d\n",CAM8A->baudrate,CAM8A->usb_write_timeout,CAM8A->usb_read_timeout  );
+          fprintf ( stderr,"libftdi BRA=%d WTA=%d RTA=%d\n",CAM8A->baudrate,CAM8A->usb_write_timeout,CAM8A->usb_read_timeout );
           Result = true;
      } else {
           Result = false;
@@ -545,11 +545,11 @@ bool cameraSetBaudrateB ( int val )
      bool Result;
      /*setup FT2232 baud rate channel B*/
      if ( ( val>=1 ) & ( val<=150 ) ) {
-	  ftdi_result=ftdi_set_baudrate ( CAM8B,val*1000/4 );
+          ftdi_result=ftdi_set_baudrate ( CAM8B,val*1000/4 );
           if ( ftdi_result<0 ) {
                fprintf ( stderr,"libftdi error set baud interface B (%d:%s)\n",ftdi_result,ftdi_get_error_string ( CAM8B ) );
           }
-          fprintf ( stderr,"libftdi BRB=%d WTB=%d RTB=%d\n",CAM8B->baudrate,CAM8B->usb_write_timeout,CAM8B->usb_read_timeout  );
+          fprintf ( stderr,"libftdi BRB=%d WTB=%d RTB=%d\n",CAM8B->baudrate,CAM8B->usb_write_timeout,CAM8B->usb_read_timeout );
           Result = true;
      } else {
           Result = false;
@@ -557,3 +557,42 @@ bool cameraSetBaudrateB ( int val )
      return Result;
 }
 
+bool cameraSetLibftdiTimerAR ( int tt )
+{
+     CAM8A->usb_read_timeout=tt;
+     return true;
+}
+
+bool cameraSetLibftdiTimerAW ( int tt )
+{
+     CAM8A->usb_write_timeout=tt;
+     return true;
+}
+
+bool cameraSetLibftdiTimerBR ( int tt )
+{
+     CAM8B->usb_read_timeout=tt;
+     return true;
+}
+
+bool cameraSetLibftdiTimerBW ( int tt )
+{
+     CAM8B->usb_write_timeout=tt;
+     return true;
+}
+
+bool cameraSetLibftdiLatA ( int ll )
+{
+     if ( ftdi_set_latency_timer ( CAM8A,ll ) <0 ) {
+          fprintf ( stderr,"libftdi error set latency interface A\n" );
+     }
+     return true;
+}
+
+bool cameraSetLibftdiLatB ( int ll )
+{
+     if ( ftdi_set_latency_timer ( CAM8B,ll ) <0 ) {
+          fprintf ( stderr,"libftdi error set latency interface B\n" );
+     }
+     return true;
+}

@@ -73,7 +73,19 @@ private:
 
      INumber BaudrateBN[1];
      INumberVectorProperty BaudrateBNP;
-     
+
+     INumber LibftditimerAN[1];
+     INumberVectorProperty LibftditimerANP;
+
+     INumber LibftdilatencyAN[1];
+     INumberVectorProperty LibftdilatencyANP;
+
+     INumber LibftditimerBN[1];
+     INumberVectorProperty LibftditimerBNP;
+
+     INumber LibftdilatencyBN[1];
+     INumberVectorProperty LibftdilatencyBNP;
+
      float ExposureRequest;
      float TemperatureRequest;
      int   timerID;

@@ -25,7 +25,7 @@
 #define __LIBCAM86_H__
 
 #define BRA 20
-#define BRB 20
+#define BRB 5
 
 #ifdef __cplusplus
 extern "C" {

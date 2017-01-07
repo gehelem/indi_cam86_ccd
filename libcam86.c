@@ -92,7 +92,7 @@ int ftdi_read_data_modified ( struct  ftdi_context * ftdi, unsigned char * buf, 
      int rsize = ftdi_read_data ( ftdi, buf, size );
      int nsize=size-rsize;
      int retry=0;
-     while ( ( nsize>0 ) & ( retry<500) ) {
+     while ( ( nsize>0 ) & ( retry<2000) ) {
           retry++;
           usleep ( 1000*1 );
           fprintf ( stderr,"Try %d since %d<>%d \n",retry, rsize,size );
@@ -303,6 +303,7 @@ void readframe ( void )
      Spi_comm ( 0x1B,0 ); //$ffff
      //pthread_detach ( t1 );
      pthread_join ( t1,NULL );
+     fprintf ( stderr,"--readframe -- Done !\n" );     
 }
 
 /*Set camera gain, return bool result*/
@@ -345,14 +346,14 @@ bool cameraConnect()
      cameraSetBaudrateA(BRA);
      cameraSetBaudrateB(BRB);     
 
-     if ( ftdi_set_latency_timer ( CAM8A,10 ) <0 ) fprintf ( stderr,"libftdi error set latency interface A\n" );
-     if ( ftdi_set_latency_timer ( CAM8B,10 ) <0 ) fprintf ( stderr,"libftdi error set latency interface B\n" );;
+     if ( ftdi_set_latency_timer ( CAM8A,1 ) <0 ) fprintf ( stderr,"libftdi error set latency interface A\n" );
+     if ( ftdi_set_latency_timer ( CAM8B,1 ) <0 ) fprintf ( stderr,"libftdi error set latency interface B\n" );;
 
 //timeouts
-     CAM8A->usb_read_timeout=30000;
-     CAM8B->usb_read_timeout=10000;
-     CAM8A->usb_write_timeout=10000;
-     CAM8B->usb_write_timeout=10000;
+     CAM8A->usb_read_timeout=300;
+     CAM8B->usb_read_timeout=100;
+     CAM8A->usb_write_timeout=100;
+     CAM8B->usb_write_timeout=100;
 
      fprintf ( stderr,"libftdi BRA=%d BRB=%d TA=%d TB=%d\n",CAM8A->baudrate,CAM8B->baudrate,CAM8A->usb_read_timeout,CAM8B->usb_write_timeout );
 

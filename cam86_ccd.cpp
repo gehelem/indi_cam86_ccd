@@ -106,7 +106,7 @@ bool Cam86CCD::ISNewNumber ( const char *dev, const char *name,
           return true;
         }
 
-      if ( !strcmp ( name, BaudrateNP.name ) )
+      /*if ( !strcmp ( name, BaudrateNP.name ) )
         {
           IUUpdateNumber ( &BaudrateNP, values, names, n );
           BaudrateNP.s = IPS_OK;
@@ -114,7 +114,7 @@ bool Cam86CCD::ISNewNumber ( const char *dev, const char *name,
           cameraSetBaudrate ( BaudrateN[0].value );
           //IDMessage ( getDeviceName(), "Cam86 set baudrate = %d", ( int ) BaudrateN[0].value );
           return true;
-        }
+        }*/
 
         if ( !strcmp ( name, BaudrateANP.name ) )
         {
@@ -163,8 +163,10 @@ bool Cam86CCD::Connect()
   SetTimer ( POLLMS );
   //cameraSetBaudrate(80);
   cameraConnect();
-  //cameraSetBaudrate(80);
-//    cameraSetOffset(100);
+  cameraSetBaudrateA(BRA);
+  cameraSetBaudrateB(BRB);  
+  cameraSetOffset(-20);
+  cameraSetGain(0);
   IDMessage ( getDeviceName(), "Cam86 connected successfully!" );
 
   return true;
@@ -205,19 +207,19 @@ bool Cam86CCD::initProperties()
   const short maxBaudrate = 240;*/
 
   /* Add Gain number property (gs) */
-  IUFillNumber ( GainN, "GAIN", "Gain", "%g", 0, 63, 1, 32 );
+  IUFillNumber ( GainN, "GAIN", "Gain", "%g", 0, 63, 1, 0 );
   IUFillNumberVector ( &GainNP, GainN, 1, getDeviceName(),"GAIN",
                        "Gain", MAIN_CONTROL_TAB, IP_RW, 0, IPS_IDLE );
 
   /* Add Offset number property (gs) */
-  IUFillNumber ( OffsetN, "OFFSET", "Offset", "%g", -127, 127, 1, 0 );
+  IUFillNumber ( OffsetN, "OFFSET", "Offset", "%g", -127, 127, 1, -20 );
   IUFillNumberVector ( &OffsetNP, OffsetN, 1, getDeviceName(),"OFFSET",
                        "Offset", MAIN_CONTROL_TAB, IP_RW, 0, IPS_IDLE );
 
   /* Add Baudrate number property (gs) */
-  IUFillNumber ( BaudrateN, "BAUDRATE", "Baudrate", "%g", 5, 150, 5, 20 );
-  IUFillNumberVector ( &BaudrateNP, BaudrateN, 1, getDeviceName(),"BAUDRATE",
-                       "Baudrate", MAIN_CONTROL_TAB, IP_RW, 0, IPS_IDLE );
+//  IUFillNumber ( BaudrateN, "BAUDRATE", "Baudrate", "%g", 5, 150, 5, 20 );
+//  IUFillNumberVector ( &BaudrateNP, BaudrateN, 1, getDeviceName(),"BAUDRATE",
+//                       "Baudrate", MAIN_CONTROL_TAB, IP_RW, 0, IPS_IDLE );
 
   /* Add Baudrate A number property (gs) */
   IUFillNumber ( BaudrateAN, "BAUDRATEA", "BaudrateA", "%g", 5, 150, 5, 20 );
@@ -225,7 +227,7 @@ bool Cam86CCD::initProperties()
                        "BaudrateA", MAIN_CONTROL_TAB, IP_RW, 0, IPS_IDLE );
 
   /* Add Baudrate B number property (gs) */
-  IUFillNumber ( BaudrateBN, "BAUDRATEB", "BaudrateB", "%g", 5, 150, 5, 20 );
+  IUFillNumber ( BaudrateBN, "BAUDRATEB", "BaudrateB", "%g", 5, 150, 5, 5 );
   IUFillNumberVector ( &BaudrateBNP, BaudrateBN, 1, getDeviceName(),"BAUDRATEB",
                        "BaudrateB", MAIN_CONTROL_TAB, IP_RW, 0, IPS_IDLE );
 
@@ -260,7 +262,7 @@ bool Cam86CCD::updateProperties()
       SetTimer ( POLLMS );
       defineNumber ( &GainNP );
       defineNumber ( &OffsetNP );
-      defineNumber ( &BaudrateNP );
+      //defineNumber ( &BaudrateNP );
       defineNumber ( &BaudrateANP );
       defineNumber ( &BaudrateBNP );      
     }
@@ -268,7 +270,7 @@ bool Cam86CCD::updateProperties()
     {
       deleteProperty ( GainNP.name );
       deleteProperty ( OffsetNP.name );
-      deleteProperty ( BaudrateNP.name );
+      //deleteProperty ( BaudrateNP.name );
       deleteProperty ( BaudrateANP.name );
       deleteProperty ( BaudrateBNP.name );
     }

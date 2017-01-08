@@ -30,6 +30,7 @@ const int POLLMS           = 500;       /* Polling interval 500 ms */
 const int MAX_CCD_TEMP     = 45;		/* Max CCD temperature */
 const int MIN_CCD_TEMP	   = -55;		/* Min CCD temperature */
 const float TEMP_THRESHOLD = .25;		/* Differential temperature threshold (C)*/
+#define TEMPERATURE_UPDATE_FREQ 40      /* Update every 40 POLLMS ~ 20 second */
 
 /* Macro shortcut to CCD temperature value */
 #define currentCCDTemperature   TemperatureN[0].value
@@ -209,7 +210,7 @@ bool Cam86CCD::Connect()
   cameraSetBaudrateB ( BRB );
   cameraSetOffset ( -20 );
   cameraSetGain ( 0 );
-  IDMessage ( getDeviceName(), "Cam86 connected successfully!" );
+  IDMessage ( getDeviceName(), "Cam86 connected successfully! %f\n" , CameraGetTemp());
 
   return true;
 }
@@ -222,7 +223,7 @@ bool Cam86CCD::Disconnect()
 
   cameraDisconnect();
   return true;
-  IDMessage ( getDeviceName(), "Cam86 disconnected successfully!" );
+  IDMessage ( getDeviceName(), "Cam86 disconnected successfully!\n" );
 }
 
 /**************************************************************************************
@@ -296,7 +297,7 @@ bool Cam86CCD::initProperties()
 
 
   // We set the CCD capabilities
-  uint32_t cap = CCD_CAN_ABORT | CCD_CAN_BIN | CCD_CAN_SUBFRAME | CCD_HAS_BAYER;
+  uint32_t cap = CCD_CAN_ABORT | CCD_CAN_BIN | CCD_CAN_SUBFRAME | CCD_HAS_BAYER | CCD_HAS_COOLER;
   SetCCDCapability ( cap );
   IUSaveText ( &BayerT[2], "GRBG" );
   // Add Debug, Simulator, and Configuration controls
@@ -380,6 +381,7 @@ bool Cam86CCD::StartExposure ( float duration )
   int r = cameraStartExposure ( PrimaryCCD.getBinX()-1,PrimaryCCD.getSubX(),PrimaryCCD.getSubY(),PrimaryCCD.getSubW(),PrimaryCCD.getSubH(), duration, true );   //int r = cameraStartExposure(1,0,0,3000,2000, 0.4, true);
   gettimeofday ( &ExpStart,NULL );
 
+
   InExposure=true;
 
   // We're done
@@ -461,6 +463,12 @@ void Cam86CCD::TimerHit()
     }
 
   // TemperatureNP is defined in INDI::CCD
+    if ((TemperatureUpdateCounter++ > TEMPERATURE_UPDATE_FREQ) && !InExposure)
+    {
+	    TemperatureUpdateCounter = 0;
+	    currentCCDTemperature = CameraGetTemp();
+	    IDMessage ( getDeviceName(), "Temperature %f\n" , currentCCDTemperature); 
+    }
   switch ( TemperatureNP.s )
     {
     case IPS_IDLE:
@@ -539,7 +547,7 @@ void Cam86CCD::grabImage()
     };
 
 
-  IDMessage ( getDeviceName(), "Download complete." );
+  IDMessage ( getDeviceName(), "Download complete.\n" );
 
   // Let INDI::CCD know we're done filling the image buffer
   ExposureComplete ( &PrimaryCCD );

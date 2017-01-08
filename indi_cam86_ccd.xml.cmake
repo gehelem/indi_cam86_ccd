@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <driversList>
 <devGroup group="CCDs">
-        <device label="Cam84 CCD" mdpd="true">
-                <driver name="Generic CCD">indi_cam84_ccd</driver>
-                <version>@CAM84_VERSION_MAJOR@.@CAM84_VERSION_MINOR@</version>
+        <device label="Cam86 CCD" mdpd="true">
+                <driver name="Cam84 CCD">indi_cam86_ccd</driver>
+                <version>@CAM86_VERSION_MAJOR@.@CAM86_VERSION_MINOR@</version>
 	</device>
 </devGroup>
 </driversList>

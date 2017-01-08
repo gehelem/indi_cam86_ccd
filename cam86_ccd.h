@@ -88,6 +88,8 @@ private:
 
      float ExposureRequest;
      float TemperatureRequest;
+     int   TemperatureUpdateCounter;    
+     float currentCCDTemperature;
      int   timerID;
 
 };

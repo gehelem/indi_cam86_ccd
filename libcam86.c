@@ -485,11 +485,11 @@ bool CameraSetTemp ( int temp )
      return true;
 }
 
-uint16_t CameraGetTemp ( void )
+float CameraGetTemp ( void )
 {
      fprintf ( stderr,"--CameraGetTemp\n" );
      Spi_comm ( 0xBF,0 );
-     return siout;
+     return siout/80;
 }
 
 bool CameraCoolingOn ( void )
@@ -518,7 +518,7 @@ bool cameraGetImageReady()
 /*Set camera baudrate, return bool result*/
 bool cameraSetBaudrate ( int val )
 {
-     fprintf ( stderr,"gettemp (%f)\n", ( float ) CameraGetTemp() /80 );
+    // fprintf ( stderr,"gettemp (%f)\n", ( float ) CameraGetTemp() /80 );
      return true;
 }
 

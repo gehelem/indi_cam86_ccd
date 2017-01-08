@@ -427,7 +427,7 @@ int cameraStartExposure ( int bin,int StartX,int StartY,int NumX,int NumY, doubl
      Spi_comm ( 0x4B,mYn );
      mdeltY = NumY / 2;
      Spi_comm ( 0x5B,mdeltY );
-     fprintf ( stderr,"--cameraStartExposure A1\n" );
+//     fprintf ( stderr,"--cameraStartExposure A1\n" );
 
      mBin=bin;
      if ( bin==1 ) {
@@ -439,19 +439,19 @@ int cameraStartExposure ( int bin,int StartX,int StartY,int NumX,int NumY, doubl
           Spi_comm ( 0x8B,0 ); //no bining
           mBin=0;
      }
-     fprintf ( stderr,"--cameraStartExposure A2\n" );
+//     fprintf ( stderr,"--cameraStartExposure A2\n" );
      expoz=Duration*1000;
      durat=Duration;
      if ( expoz > 1000 ) expoz=1001;
      Spi_comm ( 0x6B,expoz );
-     fprintf ( stderr,"--cameraStartExposure A3\n" );
+//     fprintf ( stderr,"--cameraStartExposure A3\n" );
 
      mImageReady = false;
      //camera exposing
      mCameraState = 1;
 
      if ( Duration > 1.0 ) {
-          fprintf ( stderr,"--cameraStartExposure B1\n" );
+//          fprintf ( stderr,"--cameraStartExposure B1\n" );
           Spi_comm ( 0x2B,0 ); //shift3
           usleep ( 40*1000 );
           Spi_comm ( 0xCB,0 ); //clear frame
@@ -461,7 +461,7 @@ int cameraStartExposure ( int bin,int StartX,int StartY,int NumX,int NumY, doubl
           pthread_create ( &te, NULL, ExposureTimerTick, NULL );
           pthread_detach ( te );
      } else {
-          fprintf ( stderr,"--cameraStartExposure C1\n" );
+//          fprintf ( stderr,"--cameraStartExposure C1\n" );
           eexp=0;
           readframe();
      }
@@ -489,7 +489,7 @@ float CameraGetTemp ( void )
 {
      fprintf ( stderr,"--CameraGetTemp\n" );
      Spi_comm ( 0xBF,0 );
-     return siout/80;
+     return (float) siout/80;
 }
 
 bool CameraCoolingOn ( void )

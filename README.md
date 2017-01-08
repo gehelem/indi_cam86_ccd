@@ -9,9 +9,7 @@ http://www.astroclub.kiev.ua/forum/index.php?topic=28929.0
 (Ukraine/Ukrainian)
 
 # See also
-http://www.cloudynights.com/topic/497530-diy-astro-ccd-16-bit-color-6mpx-camera/
-(US/English)
-    
+
 http://astroccd.org/
 (Ukraine/Ukrainian)
 
@@ -31,6 +29,9 @@ All derived work from this code must be kept free and opensource
 http://indilib.org
 
 # Various forums about this project
+
+http://www.cloudynights.com/topic/497530-diy-astro-ccd-16-bit-color-6mpx-camera/
+(US/English)
 
 http://www.webastro.net/forum/showthread.php?t=141764
 (France/French)

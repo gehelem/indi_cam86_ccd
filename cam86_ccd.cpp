@@ -516,7 +516,7 @@ void Cam86CCD::grabImage()
   //int height = PrimaryCCD.getSubH() / PrimaryCCD.getBinY() * (PrimaryCCD.getBPP() / 8);
 
 
-  IDMessage ( getDeviceName(), "grabimage width=%d height=%d BPP=%d\n", width, height, PrimaryCCD.getBPP() );
+  IDMessage ( getDeviceName(), "grabimage width=%d height=%d BPP=%d\n", width/2, height, PrimaryCCD.getBPP() );
 
   // Fill buffer with random pattern
   while ( !cameraGetImageReady() ); // waiting image

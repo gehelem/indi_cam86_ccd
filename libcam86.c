@@ -345,8 +345,7 @@ void readframe ( void )
 
      mCameraState = 2;
      mImageReady = false;
-     ftdi_usb_purge_rx_buffer ( CAM8A );
-     usleep ( 1000*1000 );
+     //ftdi_usb_purge_rx_buffer ( CAM8A );
      //comread();
 
      pthread_t t1;

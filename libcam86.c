@@ -71,6 +71,8 @@ int32_t   dwBytesRead  = 0;
 double spusb=20000;
 double ms1;
 
+int ftdi_read_data_timeout ( struct  ftdi_context * ftdi, unsigned char * buf, int size, uint32_t timeout);
+
 /*A little explanation with FT2232LH.
  Always use this technique:
   1. First, the buffer is filled and the initial bytes (required pulse sequence BDBUS output port).
@@ -87,7 +89,7 @@ Fortunately Programnyj driver buffer it allows (in the program up to 24 MB!) To 
 	return FT_Q_Bytes;
 }*/
 
-int ftdi_read_data_modified ( struct  ftdi_context * ftdi, unsigned char * buf, int size )
+int ftdi_read_data_modified_old ( struct  ftdi_context * ftdi, unsigned char * buf, int size )
 {
      int rsize = ftdi_read_data ( ftdi, buf, size );
      int nsize=size-rsize;
@@ -100,6 +102,55 @@ int ftdi_read_data_modified ( struct  ftdi_context * ftdi, unsigned char * buf, 
           nsize = size - rsize;
      }
      return rsize;
+}
+
+int ftdi_read_data_modified ( struct  ftdi_context * ftdi, unsigned char * buf, int size )
+{
+    uint32_t read_timeout = 3000; // timeout of 3000ms. Reading should take about 2seconds, anything longer indicates a problem.
+    return ftdi_read_data_timeout(ftdi, buf, size, read_timeout);
+    
+    // return ftdi_read_data_modified_old(ftdi, buf, size);
+}
+
+int ftdi_read_data_timeout ( struct  ftdi_context * ftdi, unsigned char * buf, int size, uint32_t timeout)
+{
+    struct timeval t_start, t_current;
+    gettimeofday(&t_start, NULL);
+    
+    int rsize = ftdi_read_data ( ftdi, buf, size );
+    
+    if (rsize < 0)
+    {
+        // TODO: proper error handling
+        fprintf(stderr, "ERROR reading data");
+    }
+    
+    fprintf ( stderr,"Read %d/%d bytes\n", rsize, size);
+    
+    // fetch the missing data
+    while (rsize < size)
+    {
+        // short delay (1ms)
+        usleep ( 1000 * 1 );
+
+        // try reading the rest of the data
+        rsize = rsize + ftdi_read_data ( ftdi, buf+rsize, size-rsize );
+        
+        // check for timeout
+        gettimeofday(&t_current, NULL);
+        long elapsed = (t_current.tv_sec-t_start.tv_sec)*1000L + (t_current.tv_usec-t_start.tv_usec) / 1000; // get time difference in ms
+        
+        fprintf ( stderr,"Re-read %d/%d bytes, time elapsed %ldms, timeout %dms\n", rsize, size, elapsed ,timeout );
+        
+        if (elapsed > timeout)
+        {
+            fprintf(stderr, "Timeout ftdi_read_data_modified\n");
+            break;
+        }
+    }
+        
+    fprintf(stderr, "Exiting ftdi_read_data_modified, read %d/%d bytes\n", rsize, size);
+    return rsize;
 }
 
 void sspi ( void )
@@ -346,12 +397,12 @@ bool cameraConnect()
      cameraSetBaudrateA ( BRA );
      cameraSetBaudrateB ( BRB );
 
-     if ( ftdi_set_latency_timer ( CAM8A,1 ) <0 ) fprintf ( stderr,"libftdi error set latency interface A\n" );
-     if ( ftdi_set_latency_timer ( CAM8B,1 ) <0 ) fprintf ( stderr,"libftdi error set latency interface B\n" );;
+     if ( ftdi_set_latency_timer ( CAM8A,CAM86_LATENCYA ) <0 ) fprintf ( stderr,"libftdi error set latency interface A\n" );
+     if ( ftdi_set_latency_timer ( CAM8B,CAM86_LATENCYB ) <0 ) fprintf ( stderr,"libftdi error set latency interface B\n" );;
 
 //timeouts
-     CAM8A->usb_read_timeout=300;
-     CAM8B->usb_read_timeout=100;
+     CAM8A->usb_read_timeout=CAM86_TIMERA;
+     CAM8B->usb_read_timeout=CAM86_TIMERB;
      CAM8A->usb_write_timeout=100;
      CAM8B->usb_write_timeout=100;
 

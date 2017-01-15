@@ -26,8 +26,8 @@
 
 #define BRA 20
 #define BRB 5
-#define CAM86_LATENCYA  1
-#define CAM86_LATENCYB  1
+#define CAM86_LATENCYA  2
+#define CAM86_LATENCYB  2
 #define CAM86_TIMERA    30
 #define CAM86_TIMERB    10
 

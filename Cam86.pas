@@ -4,7 +4,6 @@ This file is the original Delphi library written by Gilmanov Rim
 All comments have been "google translated" in english 
 ***********************************************************************
 }
-
 unit cam86;
 
 interface
@@ -27,6 +26,10 @@ const CameraWidth  = 3000;    //image width
       yccd = 1000;
       spusb = 20000;          //bitbang velocity
 
+      TemperatureOffset = 1280;
+      MinErrTemp = -120.0;
+      MaxErrTemp = 120.0;
+
 {GLobal variables}
 var   IsConnected : boolean = false;        //variable-flag indicates the status of the connection with the camera
       adress : integer;                     //pointer to the current address in the output buffer FT2232HL
@@ -43,29 +46,37 @@ var   IsConnected : boolean = false;        //variable-flag indicates the status
       kolbyte:integer;
       eexp:integer;
 
+      indval:integer;
+
       siin:  array[0..3] of byte;
-      siout: word;//array[0..3] of byte;
+      siout: word;
+
+      //cached values
+      sensorTempCache : Double;
 
 procedure Spi_comm(comm:byte;param:word);      
 function CameraConnect ()      : WordBool;
 function CameraDisConnect ()   : WordBool;
 function Qbuf()                : integer;
+function Rval()                : integer;
 function CameraSetGain (val : integer) : WordBool;
 function CameraSetOffset (val : integer) : WordBool;
 function CameraStartExposure (Bin,StartX,StartY,NumX,NumY : integer; Duration : double; light : WordBool) : WordBool;
 function CameraStopExposure : WordBool;
-function CameraSetTemp(temp:single): WordBool;
-function CameraGetTemp ()      : Word;
+function CameraSetTemp(temp:double): WordBool;
+function CameraGetTemp ()      : Double;
 function CameraCoolingOn ()    : WordBool;
 function CameraCoolingOff ()   : WordBool;
+function CameraReadingTime(val: integer)  : WordBool;
 
 implementation
 
 {A little explanation with FT2232LH.
- Always use this technique:
-  1. First, the buffer is filled and the initial bytes (required pulse sequence BDBUS output port).
-This pointer is incremented adress.
-  2. Next, the whole array is passed to the output of the command: n: = Write_USB_Device_Buffer (FT_CAM8B, adress);
+Always use this technique:
+1. First, the buffer is filled and the initial bytes (required pulse sequence BDBUS output port).
+This pointer is incremented adress
+
+2. Next, the whole array is passed to the output of the command: n: = Write_USB_Device_Buffer (FT_CAM8B, adress);
 Wonderful chip FT2232HL honestly without delay all transfers to your port BDBUS. Transfer 1 byte at the same time takes 65 ns.
 Time working out the next command n: = Write_USB_Device_Buffer (FT_CAM8B, adress) depends on the workload of the OSes and is not controlled
 us. Therefore, the critical sequence of pulses need to fill the whole, rather than pass on the queue.
@@ -75,6 +86,11 @@ function Qbuf():integer;
 begin
  Get_USB_Device_QueueStatus(FT_HANDLEA);
  result:=FT_Q_Bytes;
+end;
+
+function Rval():integer;
+begin
+ result:=indval;
 end;
 
 procedure sspi;
@@ -130,14 +146,14 @@ procedure ComRead;
 begin
   co:=posl.Create(true);
   co.FreeOnTerminate:=true;
-  co.Priority:=tpNormal;//Lower;//st;//r;//Normal;
+  co.Priority:=tpNormal;//Highest;//Lower;//st;//r;//Normal;
   co.Resume;
 end;
 
 procedure posl.Execute;                                     // Array itself actually reading through ADBUS port
 {Contraption FT2232HL converting the read buffer to the buffer array image
-   due to the nature AD9822 read the high byte first, then low, and vice versa in delphi.
-   Use the type integer32, instead word16 due to overflow in subsequent operations}
+due to the nature AD9822 read the high byte first, then low, and vice versa in delphi.
+Use the type integer32, instead word16 due to overflow in subsequent operations}
 var
 x,y:integer;
 begin
@@ -177,7 +193,7 @@ begin
 end;
 
 {Filling the output buffer array for transmission and placing byte val at the address adr-chip AD9822.
-  The transfer is in sequential code.}
+ The transfer is in sequential code.}
 procedure AD9822(adr:byte;val:word);
 const
 kol = 64;
@@ -206,21 +222,20 @@ begin
 end;
 
 {Use 2 modes:
-  1.Tsvetnoy without binning.
-  2.CH / B with 2 * 2 binning.
-  Feature ICX453 matrix is that the horizontal register has twice the capacity and
-  at one step in a horizontal vertical shift register "falls" just a couple of lines,
-  so the number of rows for the two modes are similar.
+ 1.Tsvetnoy without binning.
+ 2.CH / B with 2 * 2 binning.
+ Feature ICX453 matrix is that the horizontal register has twice the capacity and
+ at one step in a horizontal vertical shift register "falls" just a couple of lines,
+ so the number of rows for the two modes are similar.
 }
 
 {Filling the output buffer array and the actual frame itself in the read operation mode 1}
 procedure readframe;
 begin
  mCameraState := 2;
-//Purge_USB_Device_IN(FT_HANDLEA);
-//Purge_USB_Device_OUT(FT_HANDLEB);
  mImageReady:=false;
  Purge_USB_Device_IN(FT_HANDLEA);
+ Purge_USB_Device_OUT(FT_HANDLEB);
  comread;
  Spi_comm($1b,0);//$ffff);
 end;
@@ -242,6 +257,11 @@ begin
  Result :=true;
 end;
 
+function CameraReadingTime(val: integer)  : WordBool;
+begin
+ Spi_comm($eb, val);
+end;
+
 {Connect camera, return bool result}
 {Survey attached devices and initialize AD9822}
 function CameraConnect () : WordBool;
@@ -250,6 +270,7 @@ I : Integer;
 begin
  FT_flag:=false;
  FT_Enable_Error_Report:=false;
+ sensorTempCache := 0;
  GetFTDeviceCount;
  I := FT_Device_Count-1;
  while I >= 0 do
@@ -269,10 +290,11 @@ begin
     FT_Current_Baud:=spusb;                         // BitMode for B-canal volocity = spusb
     Set_USB_Device_BaudRate(FT_HANDLEB);
 
-    Set_USB_Device_LatencyTimer(FT_HANDLEB,1);       //maximum speed
-    Set_USB_Device_LatencyTimer(FT_HANDLEA,1);
-    Set_USB_Device_TimeOuts(FT_HANDLEA,3000,100);
+    Set_USB_Device_LatencyTimer(FT_HANDLEB,2);       //maximum speed
+    Set_USB_Device_LatencyTimer(FT_HANDLEA,2);
+    Set_USB_Device_TimeOuts(FT_HANDLEA,6000,100);
     Set_USB_Device_TimeOuts(FT_HANDLEB,100,100);
+    Set_USB_Parameters(FT_HANDLEA,65536,0);
 
     Purge_USB_Device_IN(FT_HANDLEA);
     Purge_USB_Device_OUT(FT_HANDLEA);
@@ -287,10 +309,9 @@ begin
     CameraSetGain(0);         // Set a gain. that is not full of ADC
     CameraSetOffset(-6);
 
-    FillChar(FT_Out_Buffer,200,portfirst-$10);                //reset pin = 0;
-    Write_USB_Device_Buffer(FT_HANDLEB,@FT_Out_Buffer,200);
-    FillChar(FT_Out_Buffer,200,portfirst);                    //reset pin = 1;
-    Write_USB_Device_Buffer(FT_HANDLEB,@FT_Out_Buffer,200);
+    sleep(100);
+    //send init command
+    Spi_comm($db,0);
     sleep(100);
 
     Purge_USB_Device_IN(FT_HANDLEA);// Remove the 2 bytes that have arisen after the reset
@@ -316,7 +337,14 @@ end;
 
 procedure ExposureTimerTick(TimerID, Msg: Uint; dwUser, dw1, dw2: DWORD); stdcall;
 begin
- readframe;
+ dec(indval);
+ if indval <= 0 then
+ begin
+  KillTimer (0,ExposureTimer);
+  Spi_comm($cb,0); //clear frame
+  sleep(180);                           // for time of clear frame
+  readframe;
+ end;
 end;
 
 {Check camera connection, return bool result}
@@ -360,11 +388,12 @@ begin
  begin
   Spi_comm($2b,0); //shift3
   sleep(40);
-  Spi_comm($cb,0); //clear frame
-  sleep(180);                           // for time of clear frame
+  //Spi_comm($cb,0); //clear frame
+  //sleep(180);                           // for time of clear frame
   Spi_comm($3b,0); //off 15v
-  eexp:=round(1000*(Duration-1.2));
-  ExposureTimer := TimeSetEvent(eexp, 100, @ExposureTimerTick, 0, TIME_ONESHOT);
+  eexp:=round(1000*(Duration-1.0)); //1.2
+  indval:=eexp div 1000;
+  ExposureTimer := SetTimer(0,0,1000,@ExposureTimerTick);
  end                   else
  begin
   eexp:=0;
@@ -376,24 +405,34 @@ end;
 
 function CameraStopExposure : WordBool;// stdcall; export;
 begin
- TimeKillEvent(ExposureTimer);
+ indval:=0;
+ KillTimer (0,ExposureTimer);
+ Spi_comm($cb,0); //clear frame
+ sleep(180);                           // for time of clear frame
  if mCamerastate = 1 then readframe;
+ indval:=0;
  Result := true;
 end;
 
-function CameraSetTemp(temp:single): WordBool;// stdcall; export;
-var
-d0:word;
+function cameraGetTemp (): double;
+var temp : double;
 begin
- d0:=round(16*(temp));
- Spi_comm($ab,d0);
- Result := true;
+    Spi_comm($bf,0);
+    temp := (siout - TemperatureOffset) / 10.0;
+    if ((temp > MaxErrTemp) or (temp < MinErrTemp)) then
+    begin
+        temp := sensorTempCache;
+    end;
+    sensorTempCache := temp;
+    Result := temp;
 end;
 
-function CameraGetTemp (): Word;
+function cameraSetTemp(temp : double): WordBool;
+var d0:word;
 begin
- Spi_comm($bf,0);
- Result := siout;
+    d0 := TemperatureOffset + round(temp*10);
+    Spi_comm($ab,d0);
+    Result := true;
 end;
 
 function CameraCoolingOn (): WordBool;

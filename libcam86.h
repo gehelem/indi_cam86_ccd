@@ -28,8 +28,8 @@
 #define BRB 5
 #define CAM86_LATENCYA  2
 #define CAM86_LATENCYB  2
-#define CAM86_TIMERA    30
-#define CAM86_TIMERB    10
+#define CAM86_TIMERA    6000
+#define CAM86_TIMERB    100
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,7 +41,7 @@ bool cameraSetGain ( int val );
 bool cameraSetOffset ( int val );
 int  cameraStartExposure ( int bin,int StartX,int StartY,int NumX,int NumY, double Duration, bool light );
 bool cameraStopExposure ( void );
-bool CameraSetTemp ( int temp );
+bool CameraSetTemp ( float temp );
 float CameraGetTemp ( void );
 bool CameraCoolingOn ( void );
 bool CameraCoolingOff ( void );

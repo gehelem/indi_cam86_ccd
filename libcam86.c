@@ -345,7 +345,8 @@ void readframe ( void )
 
      mCameraState = 2;
      mImageReady = false;
-     //ftdi_usb_purge_rx_buffer ( CAM8A );
+     ftdi_usb_purge_rx_buffer ( CAM8A );
+     ftdi_usb_purge_tx_buffer ( CAM8B );
      //comread();
 
      pthread_t t1;
@@ -404,8 +405,8 @@ bool cameraConnect()
      CAM8B->usb_read_timeout=CAM86_TIMERB;
      CAM8A->usb_write_timeout=100;
      CAM8B->usb_write_timeout=100;
-
-     fprintf ( stderr,"libftdi BRA=%d BRB=%d TA=%d TB=%d\n",CAM8A->baudrate,CAM8B->baudrate,CAM8A->usb_read_timeout,CAM8B->usb_write_timeout );
+     ftdi_read_data_set_chunksize(CAM8A,65536);
+     fprintf ( stderr,"libftdi BRA=%d BRB=%d TA=%d TB=%d CSA=%d \n",CAM8A->baudrate,CAM8B->baudrate,CAM8A->usb_read_timeout,CAM8B->usb_write_timeout,CAM8A->readbuffer_chunksize);
 
 //Purge
      if ( ftdi_usb_purge_rx_buffer ( CAM8A ) <0 ) fprintf ( stderr,"libftdi error purge RX interface A\n" );
@@ -420,12 +421,12 @@ bool cameraConnect()
 
      cameraSetGain ( 0 );      // Set a gain. that is not full of ADC
      cameraSetOffset ( 0 );
+     
+     usleep(100*1000);
+     //send init command
+     Spi_comm(0xdb,0);
 
-     memset ( FT_Out_Buffer,portfirst-0x10,200 );	//reset pin = 0;
-     if ( ftdi_write_data ( CAM8B, FT_Out_Buffer, 200 ) < 0 ) fprintf ( stderr,"write failed on channel B)\n" );
-     memset ( FT_Out_Buffer,portfirst,200 );		//reset pin = 1;
-     if ( ftdi_write_data ( CAM8B, FT_Out_Buffer, 200 ) < 0 ) fprintf ( stderr,"write failed on channel B)\n" );
-     usleep ( 1000*500 );
+     usleep ( 1000*100 );
 
      // Remove the 2 bytes that have arisen after the reset
      if ( ftdi_usb_purge_rx_buffer ( CAM8A ) <0 ) fprintf ( stderr,"libftdi error purge RX interface A\n" );
@@ -454,6 +455,8 @@ void *ExposureTimerTick ( void *arg )
      dd = ( durat*1000 ) *1000;
      usleep ( dd );
      fprintf ( stderr,"--ExposureTimerTick : Tick !\n" );
+     Spi_comm(0xcb,0); //clear frame
+     usleep(1000*100);
      readframe();
      ( void ) arg;
      pthread_exit ( NULL );
@@ -504,8 +507,8 @@ int cameraStartExposure ( int bin,int StartX,int StartY,int NumX,int NumY, doubl
 //          fprintf ( stderr,"--cameraStartExposure B1\n" );
           Spi_comm ( 0x2B,0 ); //shift3
           usleep ( 40*1000 );
-          Spi_comm ( 0xCB,0 ); //clear frame
-          usleep ( 180*1000 ); //for time of clear frame
+          //Spi_comm ( 0xCB,0 ); //clear frame
+          //usleep ( 180*1000 ); //for time of clear frame
           Spi_comm ( 0x3B,0 ); //off 15v
           eexp= ( 1000* ( Duration-1.2 ) );
           pthread_create ( &te, NULL, ExposureTimerTick, NULL );
@@ -526,20 +529,20 @@ bool cameraStopExposure()
      return true;
 }
 
-bool CameraSetTemp ( int temp )
+bool CameraSetTemp ( float temp )
 {
      uint8_t d0;
 
-     d0=16*temp;
+     d0=1280 + temp*10;
      Spi_comm ( 0xAB,d0 );
      return true;
 }
 
 float CameraGetTemp ( void )
 {
-     fprintf ( stderr,"--CameraGetTemp\n" );
      Spi_comm ( 0xBF,0 );
-     return (float) siout/80;
+     fprintf ( stderr,"--CameraGetTemp %d \n",siout );     
+     return ((float) (siout)-1280)/10;
 }
 
 bool CameraCoolingOn ( void )

@@ -89,68 +89,59 @@ Fortunately Programnyj driver buffer it allows (in the program up to 24 MB!) To 
 	return FT_Q_Bytes;
 }*/
 
-int ftdi_read_data_modified_old ( struct  ftdi_context * ftdi, unsigned char * buf, int size )
+int ftdi_read_data_modified(struct ftdi_context *ftdi, unsigned char *buf, int size)
 {
-     int rsize = ftdi_read_data ( ftdi, buf, size );
-     int nsize=size-rsize;
-     int retry=0;
-     while ( ( nsize>0 ) & ( retry<2000 ) ) {
-          retry++;
-          usleep ( 1000*1 );
-          fprintf ( stderr,"Try %d since %d<>%d \n",retry, rsize,size );
-          rsize = rsize+ftdi_read_data ( ftdi, buf+rsize, nsize );
-          nsize = size - rsize;
-     }
-     return rsize;
-}
+	const int uSECPERSEC = 1000000;
+	const int uSECPERMILLISEC = 1000;
 
-int ftdi_read_data_modified ( struct  ftdi_context * ftdi, unsigned char * buf, int size )
-{
-    uint32_t read_timeout = 3000; // timeout of 3000ms. Reading should take about 2seconds, anything longer indicates a problem.
-    return ftdi_read_data_timeout(ftdi, buf, size, read_timeout);
-    
-    // return ftdi_read_data_modified_old(ftdi, buf, size);
-}
+	int offset;
+	int result;
+	// Sleep interval, 1 microsecond
+	struct timespec tm;
+	tm.tv_sec = 0;
+	tm.tv_nsec = 1000L;
+	// Read timeout
+	struct timeval startTime;
+	struct timeval timeout;
+	struct timeval now;
 
-int ftdi_read_data_timeout ( struct  ftdi_context * ftdi, unsigned char * buf, int size, uint32_t timeout)
-{
-    struct timeval t_start, t_current;
-    gettimeofday(&t_start, NULL);
-    
-    int rsize = ftdi_read_data ( ftdi, buf, size );
-    
-    if (rsize < 0)
-    {
-        // TODO: proper error handling
-        fprintf(stderr, "ERROR reading data");
-    }
-    
-    fprintf ( stderr,"Read %d/%d bytes\n", rsize, size);
-    
-    // fetch the missing data
-    while (rsize < size)
-    {
-        // short delay (1ms)
-        usleep ( 1000 * 1 );
+	gettimeofday(&startTime, NULL);
+	// usb_read_timeout in milliseconds
+	// Calculate read timeout time of day
+	timeout.tv_sec = startTime.tv_sec + ftdi->usb_read_timeout / uSECPERMILLISEC;
+	timeout.tv_usec = startTime.tv_usec + ((ftdi->usb_read_timeout % uSECPERMILLISEC)*uSECPERMILLISEC);
+	if (timeout.tv_usec >= uSECPERSEC)
+	{
+		timeout.tv_sec++;
+		timeout.tv_usec -= uSECPERSEC;
+	}
 
-        // try reading the rest of the data
-        rsize = rsize + ftdi_read_data ( ftdi, buf+rsize, size-rsize );
-        
-        // check for timeout
-        gettimeofday(&t_current, NULL);
-        long elapsed = (t_current.tv_sec-t_start.tv_sec)*1000L + (t_current.tv_usec-t_start.tv_usec) / 1000; // get time difference in ms
-        
-        fprintf ( stderr,"Re-read %d/%d bytes, time elapsed %ldms, timeout %dms\n", rsize, size, elapsed ,timeout );
-        
-        if (elapsed > timeout)
-        {
-            fprintf(stderr, "Timeout ftdi_read_data_modified\n");
-            break;
-        }
-    }
-        
-    fprintf(stderr, "Exiting ftdi_read_data_modified, read %d/%d bytes\n", rsize, size);
-    return rsize;
+	offset = 0;
+	result = 0;
+
+	while (size > 0)
+	{
+		result = ftdi_read_data(ftdi, buf+offset, size);
+		if (result < 0)
+		{
+			fprintf ( stderr,"Read failed -- error (%d))\n",result );
+			break;
+		}
+		if (result == 0)
+		{
+			gettimeofday(&now, NULL);
+			if (now.tv_sec > timeout.tv_sec || (now.tv_sec == timeout.tv_sec && now.tv_usec > timeout.tv_usec))
+			{
+				fprintf ( stderr,"Read failed -- timeout)\n" );
+				break;
+			}
+			nanosleep(&tm, NULL); //sleep for 1 microsecond
+			continue;
+		}
+		size -= result;
+		offset += result;
+	}
+	return offset;
 }
 
 void sspi ( void )
@@ -405,7 +396,8 @@ bool cameraConnect()
      CAM8B->usb_read_timeout=CAM86_TIMERB;
      CAM8A->usb_write_timeout=100;
      CAM8B->usb_write_timeout=100;
-     ftdi_read_data_set_chunksize(CAM8A,65536);
+     //ftdi_read_data_set_chunksize(CAM8A,65536);
+     ftdi_read_data_set_chunksize(CAM8A, 1<<14);
      fprintf ( stderr,"libftdi BRA=%d BRB=%d TA=%d TB=%d CSA=%d \n",CAM8A->baudrate,CAM8B->baudrate,CAM8A->usb_read_timeout,CAM8B->usb_write_timeout,CAM8A->readbuffer_chunksize);
 
 //Purge

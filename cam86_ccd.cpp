@@ -211,6 +211,8 @@ bool Cam86CCD::Connect()
   cameraSetOffset ( -20 );
   cameraSetGain ( 0 );
   IDMessage ( getDeviceName(), "Cam86 connected successfully! %f\n" , CameraGetTemp());
+  //CameraSetTemp(0);
+  //CameraCoolingOn();
 
   return true;
 }
@@ -467,7 +469,13 @@ void Cam86CCD::TimerHit()
     {
 	    TemperatureUpdateCounter = 0;
 	    currentCCDTemperature = CameraGetTemp();
-	    IDMessage ( getDeviceName(), "Temperature %f\n" , currentCCDTemperature); 
+	    float tempDHT=CameraGetTempDHT();
+	    float HUM=CameraGetHum();
+	    
+	    IDMessage ( getDeviceName(), "CCD Temp %f Ext. TEmp %f Humidity %f \n" , currentCCDTemperature,tempDHT,HUM); 
+	    //IDMessage ( getDeviceName(), "TemperatureDHT %f\n" , tempDHT); 
+	   // IDMessage ( getDeviceName(), "HUM %f\n" , HUM); 
+	    
     }
   switch ( TemperatureNP.s )
     {

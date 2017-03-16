@@ -26,8 +26,8 @@
 
 #define BRA 20
 #define BRB 5
-#define CAM86_LATENCYA  2
-#define CAM86_LATENCYB  2
+#define CAM86_LATENCYA  20
+#define CAM86_LATENCYB  20
 #define CAM86_TIMERA    6000
 #define CAM86_TIMERB    100
 
@@ -43,6 +43,8 @@ int  cameraStartExposure ( int bin,int StartX,int StartY,int NumX,int NumY, doub
 bool cameraStopExposure ( void );
 bool CameraSetTemp ( float temp );
 float CameraGetTemp ( void );
+float CameraGetTempDHT ( void );
+float CameraGetHum ( void );
 bool CameraCoolingOn ( void );
 bool CameraCoolingOff ( void );
 bool cameraGetImageReady ( void );
@@ -56,6 +58,7 @@ bool cameraSetLibftdiTimerBR ( int tt );
 bool cameraSetLibftdiTimerBW ( int tt );
 bool cameraSetLibftdiLatA ( int ll );
 bool cameraSetLibftdiLatB ( int ll );
+
 
 #ifdef __cplusplus
 }

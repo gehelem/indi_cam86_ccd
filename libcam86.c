@@ -192,7 +192,7 @@ void sspo ( void )
 void Spi_comm ( uint8_t comm, uint16_t param )
 {
      //fprintf(stderr,"--Spi_comm\n");
-     fprintf ( stderr,"--Spi_comm param (%04X) comm (%02X)\n",param,comm );
+     //fprintf ( stderr,"--Spi_comm param (%04X) comm (%02X)\n",param,comm );
      ftdi_usb_purge_rx_buffer ( CAM8B );
      ftdi_usb_purge_tx_buffer ( CAM8B );
      siin[0]=comm;
@@ -533,8 +533,22 @@ bool CameraSetTemp ( float temp )
 float CameraGetTemp ( void )
 {
      Spi_comm ( 0xBF,0 );
-     fprintf ( stderr,"--CameraGetTemp %d \n",siout );     
+     //fprintf ( stderr,"--CameraGetTemp %d \n",siout );     
      return ((float) (siout)-1280)/10;
+}
+
+float CameraGetTempDHT ( void )
+{
+     Spi_comm ( 0xF1,0 );
+     //fprintf ( stderr,"--CameraGetTempDHT %d \n",siout );     
+     return ((float) (siout)-1280)/10;
+}
+
+float CameraGetHum ( void )
+{
+     Spi_comm ( 0xF2,0 );
+     //fprintf ( stderr,"--CameraGetHUM %d \n",siout );     
+     return ((float) (siout))/10;
 }
 
 bool CameraCoolingOn ( void )

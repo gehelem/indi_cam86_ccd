@@ -48,7 +48,8 @@ float CameraGetHum ( void );
 bool CameraCoolingOn ( void );
 bool CameraCoolingOff ( void );
 bool cameraGetImageReady ( void );
-uint16_t cameraGetImage ( int i, int j );
+uint16_t cameraGetImageXY ( int i, int j );
+char *cameraGetImage(void);
 bool cameraSetBaudrate ( int val );
 bool cameraSetBaudrateA ( int val );
 bool cameraSetBaudrateB ( int val );
@@ -63,6 +64,15 @@ bool cameraSetCoolingMaximumPowerPercentage(int val);
 bool cameraSetReadingTime(int val);
 bool cameraSetCoolerDuringReading(int val);
 float cameraGetCoolerPower(void);
+int  cameraGetCameraState(void);
+int cameraGetError(void);
+int cameraGetFirmwareVersion(void);
+int cameraGetLLDriverVersion (void);
+bool cameraSetBiasBeforeExposure(bool val);
+int cameraGetCoolingStartingPowerPercentage (void);
+int cameraGetCoolingMaximumPowerPercentage (void);
+bool cameraSetPIDproportionalGain(float val);
+
 
 
 #ifdef __cplusplus

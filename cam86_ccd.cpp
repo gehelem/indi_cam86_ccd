@@ -402,6 +402,7 @@ bool Cam86CCD::StartExposure ( float duration )
 bool Cam86CCD::AbortExposure()
 {
   InExposure = false;
+  cameraStopExposure;
   return true;
 }
 
@@ -560,7 +561,7 @@ void Cam86CCD::grabImage()
       for ( int j=PrimaryCCD.getSubY(); j < height + PrimaryCCD.getSubY(); j++ )
         for ( int i=PrimaryCCD.getSubX(); i < ( PrimaryCCD.getSubX() +width ) /2; i++ )
           {
-            uint16_t pix = cameraGetImage ( i,j );
+            uint16_t pix = cameraGetImageXY ( i,j );
             uint8_t hibyte = ( pix & 0xff00 ) >> 8;
             uint8_t lobyte = ( pix & 0xff );
             image[2*i+  j*width] = hibyte;
@@ -572,7 +573,7 @@ void Cam86CCD::grabImage()
       for ( int j=0; j < height ; j++ )
         for ( int i=0; i < width/2; i++ )
           {
-            uint16_t pix = cameraGetImage ( 2*i,2*j );
+            uint16_t pix = cameraGetImageXY ( 2*i,2*j );
             uint8_t hibyte = ( pix & 0xff00 ) >> 8;
             uint8_t lobyte = ( pix & 0xff );
             image[2*i+  j*width] = hibyte;

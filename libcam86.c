@@ -32,6 +32,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <sys/time.h>
+#include <signal.h>
 #include "libcam86.h"
 #include "config.h"
 
@@ -46,7 +47,7 @@ const int  yccd   = 1000;
 bool isConnected  = false;    //variable-flag indicates the status of the connection with the camera
 int  adress;        //pointer to the current address in the output buffer FT2232HL
 int  mBin;        //Binning
-bool mImageReady  = false;        //variable-flag displays readiness for reading frame
+bool imageReady  = false;        //variable-flag displays readiness for reading frame
 int  mCameraState = 0;     //Variable-state camera  0 - ready 1 - longexp 2 - read
 int  ExposureTimer;      //exposure timer
 //      co: posl;                           // Variable for the second stream (image reading)
@@ -66,6 +67,7 @@ static uint8_t FT_In_Buffer[26000000];
 static uint8_t FT_Out_Buffer[26000000];
 int  FT_Current_Baud;
 bool FT_OP_flag;
+bool FT_flag;
 struct ftdi_context *CAM8A, *CAM8B;
 int32_t   dwBytesRead  = 0;
 double spusb=20000;
@@ -83,7 +85,7 @@ int cameraDownload = 4;
 int cameraError = 5;
 bool errorWriteFlag = false;
 bool errorReadFlag = false;
-
+pthread_t te;
 //cached values
 double sensorTempCache = 0;
 double targetTempCache = 0;
@@ -107,10 +109,7 @@ int exposure_time_loop_counter;
 // used when 0s exposure image is taken to clear the sensor before real exposure
 bool sensorClear;
 
-
-
-
-//int ftdi_read_data_timeout ( struct  ftdi_context * ftdi, unsigned char * buf, int size, uint32_t timeout );
+int softwareLLDriverVersion = 91;
 
 /*A little explanation with FT2232LH.
  Always use this technique:
@@ -306,8 +305,13 @@ void *posExecute ( void *arg ) // Array itself actually reading through ADBUS po
                }
           }
      }
-     mCameraState =0;
-     mImageReady = true;
+     // discard image if sensorClearing was required (Bias frame before exposure)
+     if ( sensorClear ) {
+          imageReady = false;
+          sensorClear=false;
+     } else {
+          imageReady=true;
+     }
      cameraState=cameraIdle;
 
      ( void ) arg;
@@ -318,7 +322,7 @@ void *posExecute ( void *arg ) // Array itself actually reading through ADBUS po
   The transfer is in sequential code.*/
 void AD9822 ( uint8_t adr,uint16_t val )
 {
-     fprintf ( stderr,"--AD9822\n" );
+     //fprintf ( stderr,"--AD9822\n" );
      int kol = 64;
      uint8_t dan[kol];
      int i;
@@ -379,8 +383,12 @@ void AD9822 ( uint8_t adr,uint16_t val )
           dan[31]=dan[31]+4;
           dan[32]=dan[32]+4;
      };
-
-     if ( ftdi_write_data ( CAM8B, dan, sizeof ( dan ) ) < 0 ) fprintf ( stderr,"write failed on channel B)\n" );
+     if ( !errorWriteFlag ) {
+          if ( ftdi_write_data ( CAM8B, dan, sizeof ( dan ) ) < 0 ) {
+               fprintf ( stderr,"write failed on channel B)\n" );
+               errorWriteFlag=true;
+          }
+     }
 }
 
 /*Use 2 modes:
@@ -393,13 +401,11 @@ void AD9822 ( uint8_t adr,uint16_t val )
 //Filling the output buffer array and the actual frame itself in the read operation mode 1
 void readframe ( void )
 {
-     fprintf ( stderr,"--readframe\n" );
+     //fprintf ( stderr,"--readframe\n" );
 
      cameraState = cameraReading;
-     mCameraState = 2;
-     mImageReady = false;
      ftdi_usb_purge_rx_buffer ( CAM8A );
-     ftdi_usb_purge_tx_buffer ( CAM8B );
+     //ftdi_usb_purge_tx_buffer ( CAM8B );
      //comread();
 
      pthread_t t1;
@@ -407,7 +413,7 @@ void readframe ( void )
      Spi_comm ( 0x1B,0 ); //$ffff
      //pthread_detach ( t1 );
      pthread_join ( t1,NULL );
-     fprintf ( stderr,"--readframe -- Done !\n" );
+     //fprintf ( stderr,"--readframe -- Done !\n" );
 }
 
 /*Set camera gain, return bool result*/
@@ -434,84 +440,122 @@ bool cameraConnect()
 {
      fprintf ( stderr,"--cameraConnect\n" );
 
-     FT_OP_flag = true;
+     FT_flag=true;
+     errorWriteFlag=false;
+     sensorTempCache = 0;
+     targetTempCache = 0;
+     coolerOnCache = false;
+     coolerPowerCache = 0;
+     firmwareVersionCache = 0;
+
      CAM8A = ftdi_new();
      CAM8B = ftdi_new();
      if ( ftdi_set_interface ( CAM8A, INTERFACE_A ) <0 ) fprintf ( stderr,"libftdi error set interface A\n" );
      if ( ftdi_set_interface ( CAM8B, INTERFACE_B ) <0 ) fprintf ( stderr,"libftdi error set interface B\n" );
-     if ( ftdi_usb_open ( CAM8A, 0x0403, 0x6010 ) <0 ) fprintf ( stderr,"libftdi error open interface A\n" );
-     if ( ftdi_usb_open ( CAM8B, 0x0403, 0x6010 ) <0 ) fprintf ( stderr,"libftdi error open interface B\n" );
+     if ( FT_flag ) {
+          if ( ftdi_usb_open ( CAM8A, 0x0403, 0x6010 ) <0 ) {
+               fprintf ( stderr,"libftdi error open interface A\n" );
+               FT_flag=false;
+          }
+     }
+     if ( FT_flag ) {
+          if ( ftdi_usb_open ( CAM8B, 0x0403, 0x6010 ) <0 ) {
+               fprintf ( stderr,"libftdi error open interface B\n" );
+               FT_flag=false;
+          }
+     }
 
 // BitBang channel 2
-     if ( ftdi_set_bitmode ( CAM8B, 0xBF, BITMODE_SYNCBB ) <0 ) fprintf ( stderr,"libftdi error set bitbang mode interface B\n" );
-     //BITMODE_BITBANG / BITMODE_SYNCBB
+     if ( FT_flag ) {
+          if ( ftdi_set_bitmode ( CAM8B, 0xBF, BITMODE_SYNCBB ) <0 ) { //BITMODE_BITBANG / BITMODE_SYNCBB
+               fprintf ( stderr,"libftdi error set bitbang mode interface B\n" );
+               FT_flag=false;
+          }
+     }
+
 
 // Baudrate
-     cameraSetBaudrateA ( BRA );
-     cameraSetBaudrateB ( BRB );
+     if ( FT_flag ) FT_flag=cameraSetBaudrateA ( BRA );
+     if ( FT_flag ) FT_flag=cameraSetBaudrateB ( BRB );
 
-     if ( ftdi_set_latency_timer ( CAM8A,CAM86_LATENCYA ) <0 ) fprintf ( stderr,"libftdi error set latency interface A\n" );
-     if ( ftdi_set_latency_timer ( CAM8B,CAM86_LATENCYB ) <0 ) fprintf ( stderr,"libftdi error set latency interface B\n" );;
+     if ( FT_flag ) {
+          if ( ftdi_set_latency_timer ( CAM8A,CAM86_LATENCYA ) <0 ) fprintf ( stderr,"libftdi error set latency interface A\n" );
+          if ( ftdi_set_latency_timer ( CAM8B,CAM86_LATENCYB ) <0 ) fprintf ( stderr,"libftdi error set latency interface B\n" );;
 
 //timeouts
-     CAM8A->usb_read_timeout=CAM86_TIMERA;
-     CAM8B->usb_read_timeout=CAM86_TIMERB;
-     CAM8A->usb_write_timeout=100;
-     CAM8B->usb_write_timeout=100;
-     //ftdi_read_data_set_chunksize(CAM8A,65536);
-     ftdi_read_data_set_chunksize ( CAM8A, 1<<14 );
-     fprintf ( stderr,"libftdi BRA=%d BRB=%d TA=%d TB=%d CSA=%d \n",CAM8A->baudrate,CAM8B->baudrate,CAM8A->usb_read_timeout,CAM8B->usb_write_timeout,CAM8A->readbuffer_chunksize );
+          CAM8A->usb_read_timeout=CAM86_TIMERA;
+          CAM8B->usb_read_timeout=CAM86_TIMERB;
+          CAM8A->usb_write_timeout=100;
+          CAM8B->usb_write_timeout=100;
+          //ftdi_read_data_set_chunksize(CAM8A,65536);
+          ftdi_read_data_set_chunksize ( CAM8A, 1<<14 );
+          fprintf ( stderr,"libftdi BRA=%d BRB=%d TA=%d TB=%d CSA=%d \n",CAM8A->baudrate,CAM8B->baudrate,CAM8A->usb_read_timeout,CAM8B->usb_write_timeout,CAM8A->readbuffer_chunksize );
 
 //Purge
-     if ( ftdi_usb_purge_rx_buffer ( CAM8A ) <0 ) fprintf ( stderr,"libftdi error purge RX interface A\n" );
-     if ( ftdi_usb_purge_tx_buffer ( CAM8A ) <0 ) fprintf ( stderr,"libftdi error purge TX interface A\n" );
-     if ( ftdi_usb_purge_rx_buffer ( CAM8B ) <0 ) fprintf ( stderr,"libftdi error purge RX interface B\n" );
-     if ( ftdi_usb_purge_tx_buffer ( CAM8B ) <0 ) fprintf ( stderr,"libftdi error purge TX interface B\n" );
+          if ( ftdi_usb_purge_rx_buffer ( CAM8A ) <0 ) fprintf ( stderr,"libftdi error purge RX interface A\n" );
+          if ( ftdi_usb_purge_tx_buffer ( CAM8A ) <0 ) fprintf ( stderr,"libftdi error purge TX interface A\n" );
+          if ( ftdi_usb_purge_rx_buffer ( CAM8B ) <0 ) fprintf ( stderr,"libftdi error purge RX interface B\n" );
+          if ( ftdi_usb_purge_tx_buffer ( CAM8B ) <0 ) fprintf ( stderr,"libftdi error purge TX interface B\n" );
 
-     adress =0;
+          adress =0;
 
-     AD9822 ( 0,0xD8 );
-     AD9822 ( 1,0xA0 );
+          AD9822 ( 0,0xD8 );
+          AD9822 ( 1,0xA0 );
 
-     cameraSetGain ( 0 );      // Set a gain. that is not full of ADC
-     cameraSetOffset ( 0 );
+          cameraSetGain ( 0 );      // Set a gain. that is not full of ADC
+          cameraSetOffset ( 0 );
 
-     usleep ( 100*1000 );
-     //send init command
-     Spi_comm ( 0xdb,0 );
+          usleep ( 100*1000 );
+          //send init command
+          Spi_comm ( 0xdb,0 );
 
-     usleep ( 1000*100 );
+          usleep ( 100*1000 );
 
-     // Remove the 2 bytes that have arisen after the reset
-     if ( ftdi_usb_purge_rx_buffer ( CAM8A ) <0 ) fprintf ( stderr,"libftdi error purge RX interface A\n" );
-     mBin=0;
-
-     mCameraState=0;
-
+          // Remove the 2 bytes that have arisen after the reset
+          if ( ftdi_usb_purge_rx_buffer ( CAM8A ) <0 ) fprintf ( stderr,"libftdi error purge RX interface A\n" );
+          mBin=0;
+     }
+     isConnected = FT_flag;
+     errorReadFlag=false;
      cameraState = cameraIdle;
-     //fprintf ( stderr,"gettemp (%" PRIu16 ")\n",CameraGetTemp() );
-     isConnected = true;
+     imageReady=false;
+
+     if ( !FT_flag ) {
+          cameraState=cameraError;
+     }
+
      return isConnected;
 }
 
 /*Disconnect camera, return bool result*/
 bool cameraDisconnect ( void )
 {
+     bool FT_OP_flag = true;
+
      ftdi_disable_bitbang ( CAM8B );
-     ftdi_usb_close ( CAM8B );
-     ftdi_free ( CAM8B );
-     ftdi_usb_close ( CAM8A );
-     ftdi_free ( CAM8A );
+
+     if ( FT_OP_flag ) {
+          if ( ftdi_usb_close ( CAM8B ) <0 ) FT_OP_flag=false;
+     }
+     if ( FT_OP_flag ) ftdi_free ( CAM8B );
+
+     if ( FT_OP_flag ) {
+          if ( ftdi_usb_close ( CAM8A ) <0 ) FT_OP_flag=false;
+     }
+     if ( FT_OP_flag ) ftdi_free ( CAM8A );
+
+     isConnected=!FT_OP_flag;
+     return FT_OP_flag;
 }
 
 void *ExposureTimerTick ( void *arg )
 {
-     fprintf ( stderr,"--ExposureTimerTick\n" );
+     //fprintf ( stderr,"--ExposureTimerTick\n" );
      uint32_t dd;
      dd = ( durat*1000 ) *1000;
      usleep ( dd );
-     fprintf ( stderr,"--ExposureTimerTick : Tick !\n" );
-     Spi_comm ( 0xcb,0 ); //clear frame
+     //fprintf ( stderr,"--ExposureTimerTick : Tick !\n" );
+     //Spi_comm ( 0xcb,0 ); //clear frame
      usleep ( 1000*100 );
      readframe();
      ( void ) arg;
@@ -524,13 +568,50 @@ bool cameraIsConnected()
      return isConnected;
 }
 
+void cameraSensorClearFull ( void )
+{
+     int expoz;
+     errorReadFlag = false;
+     imageReady = false;
+     mYn=0;
+     Spi_comm ( 0x4b,mYn );
+     mdeltY=CameraHeight / 2;
+     Spi_comm ( 0x5b,mdeltY );
+
+     // use 2x2 binning to increase the reading speed
+     // the image will be deleted anyway
+     kolbyte=mdeltY*3008;
+     //bining
+     Spi_comm ( 0x8b,1 );
+     mBin=1;
+
+     expoz = 0; // zero exposure
+     Spi_comm ( 0x6b,expoz );
+
+     cameraState = cameraExposing;
+
+     eexp=0;
+     readframe;
+
+     // wait until the bias frame has been read - we will discard the data
+     // This will lock this main thread for a short time... not sure if this is a good thing?
+     // this seems to take 1600 ms
+     while ( sensorClear ) {
+          usleep ( 10*1000 );
+     }
+
+     // now exit to do proper exposure
+}
+
 int cameraStartExposure ( int bin,int StartX,int StartY,int NumX,int NumY, double Duration, bool light )
 {
      fprintf ( stderr,"--cameraStartExposure bin %d x %d y %d w %d h %d s %f l %d\n",bin,StartX,StartY,NumX,NumY,Duration,light );
-     //fprintf ( stderr,"gettemp (%" PRIu16 ")\n",CameraGetTemp() );
+     if ( sensorClear ) cameraSensorClearFull;
      uint8_t d0,d1;
      int expoz;
-     pthread_t te;
+
+     errorReadFlag = false;
+     imageReady = false;
 
      mYn = StartY / 2;
      Spi_comm ( 0x4B,mYn );
@@ -538,8 +619,7 @@ int cameraStartExposure ( int bin,int StartX,int StartY,int NumX,int NumY, doubl
      Spi_comm ( 0x5B,mdeltY );
 //     fprintf ( stderr,"--cameraStartExposure A1\n" );
 
-     mBin=bin;
-     if ( bin==1 ) {
+     if ( bin==2 ) {
           kolbyte=mdeltY*3008;
           Spi_comm ( 0x8B,1 ); //bining
           mBin=1;
@@ -551,20 +631,18 @@ int cameraStartExposure ( int bin,int StartX,int StartY,int NumX,int NumY, doubl
 //     fprintf ( stderr,"--cameraStartExposure A2\n" );
      expoz=Duration*1000;
      durat=Duration;
-     if ( expoz > 1000 ) expoz=1001;
+     if ( expoz > 1000 ) expoz=1001; // what ?
      Spi_comm ( 0x6B,expoz );
 //     fprintf ( stderr,"--cameraStartExposure A3\n" );
 
-     mImageReady = false;
      //camera exposing
-     mCameraState = 1;
      cameraState = cameraExposing;
      if ( Duration > 1.0 ) {
 //          fprintf ( stderr,"--cameraStartExposure B1\n" );
           Spi_comm ( 0x2B,0 ); //shift3
           usleep ( 40*1000 );
-          //Spi_comm ( 0xCB,0 ); //clear frame
-          //usleep ( 180*1000 ); //for time of clear frame
+          Spi_comm ( 0xCB,0 ); //clear frame
+          usleep ( 180*1000 ); //for time of clear frame
           Spi_comm ( 0x3B,0 ); //off 15v
           eexp= ( 1000* ( Duration-1.2 ) );
           pthread_create ( &te, NULL, ExposureTimerTick, NULL );
@@ -581,8 +659,19 @@ int cameraStartExposure ( int bin,int StartX,int StartY,int NumX,int NumY, doubl
 bool cameraStopExposure()
 {
      // "code to kill Exposuretimer thread"
-     if ( mCameraState==1 ) readframe();
+     pthread_kill ( te,0 );
+     if ( cameraState==cameraExposing ) readframe();
      return true;
+}
+
+//Get camera state, return int result
+int  cameraGetCameraState()
+{
+     if ( !errorWriteFlag ) {
+          return cameraState;
+     } else {
+          return cameraError;
+     }
 }
 
 bool CameraSetTemp ( float temp )
@@ -592,6 +681,20 @@ bool CameraSetTemp ( float temp )
      d0=1280 + temp*10;
      Spi_comm ( 0xAB,d0 );
      return true;
+}
+
+float cameraGetSetTemp ()
+{
+float temp;
+
+    Spi_comm(0xbe,0);
+    temp = (siout - 1280) / 10.0;
+    if ((temp > 120) || (temp < -120)) 
+    {
+        temp = targetTempCache;
+    }
+    targetTempCache = temp;
+    return temp;
 }
 
 float CameraGetTemp ( void )
@@ -627,16 +730,42 @@ bool CameraCoolingOff ( void )
      return true;
 }
 
-uint16_t cameraGetImage ( int i,int j )
+bool cameraGetCoolerOn ( void )
+{
+     if ( ( cameraState = cameraReading ) || ( cameraState = cameraDownload ) ) {
+          return coolerOnCache;
+     } else {
+          Spi_comm ( 0xbd,0 );
+          if ( siout == TRUE_INV_PROT ) {
+               coolerOnCache = true;
+               return true;
+          } else if ( siout = FALSE_INV_PROT ) {
+               coolerOnCache = false;
+               return false;
+          } else {
+               return coolerOnCache;
+          }
+     }
+}
+   
+uint16_t cameraGetImageXY ( int i,int j )
 {
      cameraState=cameraIdle;
      return bufim[i][j];
 }
 
+//Get back pointer to image
+char *cameraGetImage()
+{
+    cameraState=cameraDownload;
+    cameraState=cameraIdle;
+    return *bufim;
+}
+
 /*Check ImageReady flag, is image ready for transfer - transfer image to driver and return bool ImageReady flag*/
 bool cameraGetImageReady()
 {
-     return mImageReady;
+     return imageReady;
 }
 
 /*Set camera baudrate, return bool result*/
@@ -720,16 +849,26 @@ bool cameraSetLibftdiLatB ( int ll )
      }
      return true;
 }
+//Get camera error state, return bool result
+int cameraGetError()
+{
+int res=0;
+  if (errorWriteFlag) res =res+2;
+  if (errorReadFlag)  res =res+1;
+  return res;
+}
 
 bool cameraSetCoolingStartingPowerPercentage ( int val )
 {
      Spi_comm ( 0x0A,val );
+     CoolingStartingPowerPercentageCache = val;
      return true;
 }
 
 bool cameraSetCoolingMaximumPowerPercentage ( int val )
 {
      Spi_comm ( 0x1A,val );
+     CoolingMaximumPowerPercentageCache = val;
      return true;
 }
 
@@ -759,4 +898,61 @@ float cameraGetCoolerPower ( void )
           coolerPowerCache = power;
           return power;
      };
+}
+
+int cameraGetFirmwareVersion()
+{
+     if ( ( cameraState = cameraReading ) || ( cameraState = cameraDownload ) ) {
+          return firmwareVersionCache;
+     } else {
+          Spi_comm ( 0xbb,0 );
+          firmwareVersionCache = siout && 0xff;
+          return firmwareVersionCache;
+     }
+}
+
+int cameraGetLLDriverVersion ()
+{
+    return softwareLLDriverVersion;
+}
+
+bool cameraSetBiasBeforeExposure(bool val)
+{
+    sensorClear = val;
+    return true;
+}
+
+int cameraGetCoolingStartingPowerPercentage ()
+{
+    if ((cameraState = cameraReading) || (cameraState = cameraDownload))
+    {
+        return CoolingStartingPowerPercentageCache;
+    }
+    else
+    {
+        Spi_comm(0xba,0);
+        CoolingStartingPowerPercentageCache = siout;
+        return CoolingStartingPowerPercentageCache;
+    }
+}
+
+int cameraGetCoolingMaximumPowerPercentage ()
+{
+    if ((cameraState = cameraReading) || (cameraState = cameraDownload)) 
+    {
+        return CoolingMaximumPowerPercentageCache;
+    }
+    else
+    {
+        Spi_comm(0xb9,0);
+        CoolingMaximumPowerPercentageCache = siout;
+        return CoolingMaximumPowerPercentageCache;
+    }
+}
+
+bool cameraSetPIDproportionalGain(float val)
+{
+    Spi_comm(0x2a, val*1000);
+    KpCache = val;
+    return true;
 }

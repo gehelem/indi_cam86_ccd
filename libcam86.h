@@ -58,6 +58,11 @@ bool cameraSetLibftdiTimerBR ( int tt );
 bool cameraSetLibftdiTimerBW ( int tt );
 bool cameraSetLibftdiLatA ( int ll );
 bool cameraSetLibftdiLatB ( int ll );
+bool cameraSetCoolingStartingPowerPercentage(int val);
+bool cameraSetCoolingMaximumPowerPercentage(int val);
+bool cameraSetReadingTime(int val);
+bool cameraSetCoolerDuringReading(int val);
+float cameraGetCoolerPower(void);
 
 
 #ifdef __cplusplus

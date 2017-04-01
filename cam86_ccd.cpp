@@ -23,6 +23,7 @@
 #include <sys/time.h>
 #include <memory>
 #include <math.h>
+#include <unistd.h>
 #include "cam86_ccd.h"
 #include "libcam86.h"
 
@@ -208,9 +209,14 @@ bool Cam86CCD::Connect()
   cameraConnect();
   cameraSetBaudrateA ( BRA );
   cameraSetBaudrateB ( BRB );
+  usleep(500*1000);
   cameraSetOffset ( -20 );
   cameraSetGain ( 0 );
-  IDMessage ( getDeviceName(), "Cam86 connected successfully! %f\n" , CameraGetTemp());
+  IDMessage ( getDeviceName(), "Cam86 connected successfully!\n" );
+  cameraSetCoolingStartingPowerPercentage(60);
+  cameraSetCoolingMaximumPowerPercentage(100);
+  cameraSetReadingTime(10);
+  cameraSetCoolerDuringReading(true);
   //CameraSetTemp(0);
   //CameraCoolingOn();
 
@@ -465,37 +471,57 @@ void Cam86CCD::TimerHit()
     }
 
   // TemperatureNP is defined in INDI::CCD
-    if ((TemperatureUpdateCounter++ > TEMPERATURE_UPDATE_FREQ) && !InExposure)
+    //if ((TemperatureUpdateCounter++ > TEMPERATURE_UPDATE_FREQ) && !InExposure)
+    if ((TemperatureUpdateCounter++ > TEMPERATURE_UPDATE_FREQ) )
     {
 	    TemperatureUpdateCounter = 0;
 	    currentCCDTemperature = CameraGetTemp();
 	    float tempDHT=CameraGetTempDHT();
 	    float HUM=CameraGetHum();
+	    float coolerpower = cameraGetCoolerPower();
+	
+            const double a = 17.27;
+            const double b = 237.7;
+            double dewpoint = 0; 
+
+            double c = log(HUM / 100) + a * tempDHT / (b + tempDHT);
+            dewpoint = b * c / (a - c);
+    
 	    
-	    IDMessage ( getDeviceName(), "CCD Temp %f Ext. TEmp %f Humidity %f \n" , currentCCDTemperature,tempDHT,HUM); 
-	    //IDMessage ( getDeviceName(), "TemperatureDHT %f\n" , tempDHT); 
-	   // IDMessage ( getDeviceName(), "HUM %f\n" , HUM); 
+	    IDMessage ( getDeviceName(), "CCD %.2f°C Ext %.2f Hum %.2f DP %.1f CoolerPower %.2f\n" , currentCCDTemperature,tempDHT,HUM,dewpoint,coolerpower); 
+	   // TemperatureN[0].value =currentCCDTemperature;
 	    
     }
   switch ( TemperatureNP.s )
     {
     case IPS_IDLE:
     case IPS_OK:
+	    if (fabs(currentCCDTemperature - TemperatureN[0].value) > TEMP_THRESHOLD)
+	    {
+            IDSetNumber(&TemperatureNP, NULL);
+	    TemperatureNP.s = IPS_BUSY;
+	    }
       break;
 
     case IPS_BUSY:
       /* If target temperature is higher, then increase current CCD temperature */
       if ( currentCCDTemperature < TemperatureRequest )
-        currentCCDTemperature++;
+      {
+        //currentCCDTemperature++;
+	      CameraCoolingOff();
+      }
       /* If target temperature is lower, then decrese current CCD temperature */
-      else if ( currentCCDTemperature > TemperatureRequest )
-        currentCCDTemperature--;
+      else if ( currentCCDTemperature > TemperatureRequest ) 
+      {
+        //currentCCDTemperature--;
+	      CameraCoolingOn();
+      }
       /* If they're equal, stop updating */
       else
         {
           TemperatureNP.s = IPS_OK;
           IDSetNumber ( &TemperatureNP, "Target temperature reached." );
-
+	  CameraCoolingOff();
           break;
         }
 

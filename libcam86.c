@@ -34,28 +34,28 @@
 #include <sys/time.h>
 #include "libcam86.h"
 #include "config.h"
-#include <unistd.h>
 
 
-const int 		CameraWidth		= 3000;		//image width
-const int 		CameraHeight	= 2000;		//image height
-const uint8_t	portfirst		= 0x11;		//Initial value on the output port BDBUS
-const int		xccd			= 1500;
-const int		yccd			= 1000;
 
-bool	isConnected  = false;				//variable-flag indicates the status of the connection with the camera
-int		adress;								//pointer to the current address in the output buffer FT2232HL
-int		mBin;								//Binning
-bool	mImageReady  = false; 			    //variable-flag displays readiness for reading frame
-int 	mCameraState = 0;					//Variable-state camera  0 - ready 1 - longexp 2 - read
-int 	ExposureTimer;						//exposure timer
+const int   CameraWidth  = 3000;  //image width
+const int   CameraHeight = 2000;  //image height
+const uint8_t portfirst  = 0x11;  //Initial value on the output port BDBUS
+const int  xccd   = 1500;
+const int  yccd   = 1000;
+
+bool isConnected  = false;    //variable-flag indicates the status of the connection with the camera
+int  adress;        //pointer to the current address in the output buffer FT2232HL
+int  mBin;        //Binning
+bool mImageReady  = false;        //variable-flag displays readiness for reading frame
+int  mCameraState = 0;     //Variable-state camera  0 - ready 1 - longexp 2 - read
+int  ExposureTimer;      //exposure timer
 //      co: posl;                           // Variable for the second stream (image reading)
 static uint16_t bufim[3000][2000];       // Buffer array image for operations
-int		mYn,mdeltY;							//start reading and the number of the rows
-//int		mXn,mdeltX;						//start reading and number of the columns
-uint8_t	zatv;
-int	kolbyte;
-int	eexp;
+int  mYn,mdeltY;       //start reading and the number of the rows
+//int  mXn,mdeltX;      //start reading and number of the columns
+uint8_t zatv;
+int kolbyte;
+int eexp;
 uint8_t siin[4];
 uint16_t siout;
 double durat;
@@ -70,8 +70,47 @@ struct ftdi_context *CAM8A, *CAM8B;
 int32_t   dwBytesRead  = 0;
 double spusb=20000;
 double ms1;
+double coolerPowerCache;
+const int TRUE_INV_PROT = 0xaa55;
+const int FALSE_INV_PROT = 0x55aa;
+const int HIGH_MASK_PROT = 0xaa00;
+int cameraState = 0;
+int cameraIdle = 0;
+int cameraWaiting = 1;
+int cameraExposing = 2;
+int cameraReading = 3;
+int cameraDownload = 4;
+int cameraError = 5;
+bool errorWriteFlag = false;
+bool errorReadFlag = false;
 
-int ftdi_read_data_timeout ( struct  ftdi_context * ftdi, unsigned char * buf, int size, uint32_t timeout);
+//cached values
+double sensorTempCache = 0;
+double targetTempCache = 0;
+bool coolerOnCache = false;
+double coolerPowerCache  = 0;
+int firmwareVersionCache = 0;
+double tempDHTCache  = -128.0;
+double humidityDHTCache =  -1;
+int CoolingStartingPowerPercentageCache = -1;
+int CoolingMaximumPowerPercentageCache = 101;
+double KpCache  = 0.0;
+
+
+// timer counter
+// timer can only count <1000s
+// for longer exposures repeat the timer run as needed
+int exposure_time_left;
+int eposure_time_rollover = 900000; // 900 seconds (999 seconds is max)
+int exposure_time_loop_counter;
+
+// used when 0s exposure image is taken to clear the sensor before real exposure
+bool sensorClear;
+
+
+
+
+//int ftdi_read_data_timeout ( struct  ftdi_context * ftdi, unsigned char * buf, int size, uint32_t timeout );
 
 /*A little explanation with FT2232LH.
  Always use this technique:
@@ -85,63 +124,58 @@ Fortunately Programnyj driver buffer it allows (in the program up to 24 MB!) To 
 
 /*int Qbuf(void)
 {
-	Get_USB_Device_QueueStatus(CAM8A);
-	return FT_Q_Bytes;
+ Get_USB_Device_QueueStatus(CAM8A);
+ return FT_Q_Bytes;
 }*/
 
-int ftdi_read_data_modified(struct ftdi_context *ftdi, unsigned char *buf, int size)
+int ftdi_read_data_modified ( struct ftdi_context *ftdi, unsigned char *buf, int size )
 {
-	const int uSECPERSEC = 1000000;
-	const int uSECPERMILLISEC = 1000;
+     const int uSECPERSEC = 1000000;
+     const int uSECPERMILLISEC = 1000;
 
-	int offset;
-	int result;
-	// Sleep interval, 1 microsecond
-	struct timespec tm;
-	tm.tv_sec = 0;
-	tm.tv_nsec = 1000L;
-	// Read timeout
-	struct timeval startTime;
-	struct timeval timeout;
-	struct timeval now;
+     int offset;
+     int result;
+// Sleep interval, 1 microsecond
+     struct timespec tm;
+     tm.tv_sec = 0;
+     tm.tv_nsec = 1000L;
+// Read timeout
+     struct timeval startTime;
+     struct timeval timeout;
+     struct timeval now;
 
-	gettimeofday(&startTime, NULL);
-	// usb_read_timeout in milliseconds
-	// Calculate read timeout time of day
-	timeout.tv_sec = startTime.tv_sec + ftdi->usb_read_timeout / uSECPERMILLISEC;
-	timeout.tv_usec = startTime.tv_usec + ((ftdi->usb_read_timeout % uSECPERMILLISEC)*uSECPERMILLISEC);
-	if (timeout.tv_usec >= uSECPERSEC)
-	{
-		timeout.tv_sec++;
-		timeout.tv_usec -= uSECPERSEC;
-	}
+     gettimeofday ( &startTime, NULL );
+// usb_read_timeout in milliseconds
+// Calculate read timeout time of day
+     timeout.tv_sec = startTime.tv_sec + ftdi->usb_read_timeout / uSECPERMILLISEC;
+     timeout.tv_usec = startTime.tv_usec + ( ( ftdi->usb_read_timeout % uSECPERMILLISEC ) *uSECPERMILLISEC );
+     if ( timeout.tv_usec >= uSECPERSEC ) {
+          timeout.tv_sec++;
+          timeout.tv_usec -= uSECPERSEC;
+     }
 
-	offset = 0;
-	result = 0;
+     offset = 0;
+     result = 0;
 
-	while (size > 0)
-	{
-		result = ftdi_read_data(ftdi, buf+offset, size);
-		if (result < 0)
-		{
-			fprintf ( stderr,"Read failed -- error (%d))\n",result );
-			break;
-		}
-		if (result == 0)
-		{
-			gettimeofday(&now, NULL);
-			if (now.tv_sec > timeout.tv_sec || (now.tv_sec == timeout.tv_sec && now.tv_usec > timeout.tv_usec))
-			{
-				fprintf ( stderr,"Read failed -- timeout)\n" );
-				break;
-			}
-			nanosleep(&tm, NULL); //sleep for 1 microsecond
-			continue;
-		}
-		size -= result;
-		offset += result;
-	}
-	return offset;
+     while ( size > 0 ) {
+          result = ftdi_read_data ( ftdi, buf+offset, size );
+          if ( result < 0 ) {
+               fprintf ( stderr,"Read failed -- error (%d))\n",result );
+               break;
+          }
+          if ( result == 0 ) {
+               gettimeofday ( &now, NULL );
+               if ( now.tv_sec > timeout.tv_sec || ( now.tv_sec == timeout.tv_sec && now.tv_usec > timeout.tv_usec ) ) {
+                    fprintf ( stderr,"Read failed -- timeout)\n" );
+                    break;
+               }
+               nanosleep ( &tm, NULL ); //sleep for 1 microsecond
+               continue;
+          }
+          size -= result;
+          offset += result;
+     }
+     return offset;
 }
 
 void sspi ( void )
@@ -164,20 +198,32 @@ void sspi ( void )
                b=b*2;
           }
      }
-     if ( ftdi_write_data ( CAM8B, FT_Out_Buffer, n ) < 0 ) fprintf ( stderr,"write failed on channel B)\n" );
+     if ( !errorWriteFlag ) {
+          if ( ftdi_write_data ( CAM8B, FT_Out_Buffer, n ) < 0 ) {
+               fprintf ( stderr,"write failed on channel B)\n" );
+               errorWriteFlag = true;
+          }
+     }
 }
 
 void sspo ( void )
 {
      //fprintf(stderr,"--sspo\n");
      int i;
-     uint16_t b;
-     uint16_t n;
+     uint16_t b,n;
+     uint16_t byteCnt, byteExpected;
      uint16_t buf;
 
      n=100;
-     dwBytesRead=ftdi_read_data_modified ( CAM8B,FT_In_Buffer,n );
-     //fprintf ( stderr,"--sspo dwBytesRead (%d)\n",dwBytesRead);
+     byteCnt = 0;
+     byteExpected = n;
+     if ( !errorWriteFlag ) {
+          byteCnt = ftdi_read_data_modified ( CAM8B,FT_In_Buffer,n );
+     }
+     if ( byteCnt != byteExpected ) {
+          errorReadFlag = true;
+     }
+     //fprintf ( stderr,"--sspo byteCnt (%d)\n",byteCnt);
      b=0;
      for ( i = 0; i <= 15; i++ ) {
           b=b*2;
@@ -218,35 +264,51 @@ uint16_t swap ( uint16_t x )
 void *posExecute ( void *arg ) // Array itself actually reading through ADBUS port
 {
      fprintf ( stderr,"--posExecute\n" );
+     uint16_t byteCnt, byteExpected;
+     byteCnt = 0;
+     byteExpected = kolbyte;
      uint16_t x,y;
-     dwBytesRead=ftdi_read_data_modified ( CAM8A,FT_In_Buffer,kolbyte );
-     if ( mBin == 0 ) {
-          for ( y=0; y <= mdeltY-1; y++ ) {
-               for ( x=0; x <= 1499; x++ ) {
-                    bufim[2*x+0][ ( 2* ( y+mYn ) +0 ) *1]= ( FT_In_Buffer[2* ( 4*x+4+y*6004 )] ) +256* ( FT_In_Buffer[2* ( 4*x+4+y*6004 ) +1] );
-                    bufim[2*x+0][ ( 2* ( y+mYn ) +1 ) *1]= ( FT_In_Buffer[2* ( 4*x+5+y*6004 )] ) +256* ( FT_In_Buffer[2* ( 4*x+5+y*6004 ) +1] );
-                    bufim[2*x+1][ ( 2* ( y+mYn ) +1 ) *1]= ( FT_In_Buffer[2* ( 4*x+6+y*6004 )] ) +256* ( FT_In_Buffer[2* ( 4*x+6+y*6004 ) +1] );
-                    bufim[2*x+1][ ( 2* ( y+mYn ) +0 ) *1]= ( FT_In_Buffer[2* ( 4*x+7+y*6004 )] ) +256* ( FT_In_Buffer[2* ( 4*x+7+y*6004 ) +1] );
-               }
+     if ( !errorWriteFlag ) {
+          byteCnt=ftdi_read_data_modified ( CAM8A,FT_In_Buffer,kolbyte );
+     }
 
+     if ( byteCnt!=byteExpected ) {
+          errorReadFlag=true;
+          if ( !errorWriteFlag ) {
+               ftdi_usb_purge_rx_buffer ( CAM8A );
+               ftdi_usb_purge_tx_buffer ( CAM8A );
           }
      } else {
-          for ( y=0; y <= mdeltY-1; y++ ) {
-               for ( x=0; x <= 1498; x++ ) {
-                    bufim[2*x+0][ ( 2* ( y+mYn ) +0 )]= FT_In_Buffer[2* ( x+7+y*1504 )] + 256*FT_In_Buffer[2* ( x+7+y*1504 ) +1];
-                    bufim[2*x+0][ ( 2* ( y+mYn ) +1 )]= FT_In_Buffer[2* ( x+7+y*1504 )] + 256*FT_In_Buffer[2* ( x+7+y*1504 ) +1] ;
-                    bufim[2*x+1][ ( 2* ( y+mYn ) +1 )]= FT_In_Buffer[2* ( x+7+y*1504 )] + 256*FT_In_Buffer[2* ( x+7+y*1504 ) +1] ;
-                    bufim[2*x+1][ ( 2* ( y+mYn ) +0 )]= FT_In_Buffer[2* ( x+7+y*1504 )] + 256*FT_In_Buffer[2* ( x+7+y*1504 ) +1] ;
+
+          if ( mBin == 0 ) {
+               for ( y=0; y <= mdeltY-1; y++ ) {
+                    for ( x=0; x <= 1499; x++ ) {
+                         bufim[2*x+0][ ( 2* ( y+mYn ) +0 ) *1]= ( FT_In_Buffer[2* ( 4*x+4+y*6004 )] ) +256* ( FT_In_Buffer[2* ( 4*x+4+y*6004 ) +1] );
+                         bufim[2*x+0][ ( 2* ( y+mYn ) +1 ) *1]= ( FT_In_Buffer[2* ( 4*x+5+y*6004 )] ) +256* ( FT_In_Buffer[2* ( 4*x+5+y*6004 ) +1] );
+                         bufim[2*x+1][ ( 2* ( y+mYn ) +1 ) *1]= ( FT_In_Buffer[2* ( 4*x+6+y*6004 )] ) +256* ( FT_In_Buffer[2* ( 4*x+6+y*6004 ) +1] );
+                         bufim[2*x+1][ ( 2* ( y+mYn ) +0 ) *1]= ( FT_In_Buffer[2* ( 4*x+7+y*6004 )] ) +256* ( FT_In_Buffer[2* ( 4*x+7+y*6004 ) +1] );
+                    }
+
                }
-               x=1499;
-               bufim[2*x+0][ ( 2* ( y+mYn ) +0 )]=FT_In_Buffer[2* ( x+6+y*1504 )] + 256*FT_In_Buffer[2* ( x+6+y*1504 ) +1] ;
-               bufim[2*x+0][ ( 2* ( y+mYn ) +1 )]=FT_In_Buffer[2* ( x+6+y*1504 )] + 256*FT_In_Buffer[2* ( x+6+y*1504 ) +1] ;
-               bufim[2*x+1][ ( 2* ( y+mYn ) +1 )]=FT_In_Buffer[2* ( x+6+y*1504 )] + 256*FT_In_Buffer[2* ( x+6+y*1504 ) +1] ;
-               bufim[2*x+1][ ( 2* ( y+mYn ) +0 )]=FT_In_Buffer[2* ( x+6+y*1504 )] + 256*FT_In_Buffer[2* ( x+6+y*1504 ) +1] ;
+          } else {
+               for ( y=0; y <= mdeltY-1; y++ ) {
+                    for ( x=0; x <= 1498; x++ ) {
+                         bufim[2*x+0][ ( 2* ( y+mYn ) +0 )]= FT_In_Buffer[2* ( x+7+y*1504 )] + 256*FT_In_Buffer[2* ( x+7+y*1504 ) +1];
+                         bufim[2*x+0][ ( 2* ( y+mYn ) +1 )]= FT_In_Buffer[2* ( x+7+y*1504 )] + 256*FT_In_Buffer[2* ( x+7+y*1504 ) +1] ;
+                         bufim[2*x+1][ ( 2* ( y+mYn ) +1 )]= FT_In_Buffer[2* ( x+7+y*1504 )] + 256*FT_In_Buffer[2* ( x+7+y*1504 ) +1] ;
+                         bufim[2*x+1][ ( 2* ( y+mYn ) +0 )]= FT_In_Buffer[2* ( x+7+y*1504 )] + 256*FT_In_Buffer[2* ( x+7+y*1504 ) +1] ;
+                    }
+                    x=1499;
+                    bufim[2*x+0][ ( 2* ( y+mYn ) +0 )]=FT_In_Buffer[2* ( x+6+y*1504 )] + 256*FT_In_Buffer[2* ( x+6+y*1504 ) +1] ;
+                    bufim[2*x+0][ ( 2* ( y+mYn ) +1 )]=FT_In_Buffer[2* ( x+6+y*1504 )] + 256*FT_In_Buffer[2* ( x+6+y*1504 ) +1] ;
+                    bufim[2*x+1][ ( 2* ( y+mYn ) +1 )]=FT_In_Buffer[2* ( x+6+y*1504 )] + 256*FT_In_Buffer[2* ( x+6+y*1504 ) +1] ;
+                    bufim[2*x+1][ ( 2* ( y+mYn ) +0 )]=FT_In_Buffer[2* ( x+6+y*1504 )] + 256*FT_In_Buffer[2* ( x+6+y*1504 ) +1] ;
+               }
           }
      }
      mCameraState =0;
      mImageReady = true;
+     cameraState=cameraIdle;
 
      ( void ) arg;
      pthread_exit ( NULL );
@@ -333,7 +395,7 @@ void readframe ( void )
 {
      fprintf ( stderr,"--readframe\n" );
 
-
+     cameraState = cameraReading;
      mCameraState = 2;
      mImageReady = false;
      ftdi_usb_purge_rx_buffer ( CAM8A );
@@ -397,8 +459,8 @@ bool cameraConnect()
      CAM8A->usb_write_timeout=100;
      CAM8B->usb_write_timeout=100;
      //ftdi_read_data_set_chunksize(CAM8A,65536);
-     ftdi_read_data_set_chunksize(CAM8A, 1<<14);
-     fprintf ( stderr,"libftdi BRA=%d BRB=%d TA=%d TB=%d CSA=%d \n",CAM8A->baudrate,CAM8B->baudrate,CAM8A->usb_read_timeout,CAM8B->usb_write_timeout,CAM8A->readbuffer_chunksize);
+     ftdi_read_data_set_chunksize ( CAM8A, 1<<14 );
+     fprintf ( stderr,"libftdi BRA=%d BRB=%d TA=%d TB=%d CSA=%d \n",CAM8A->baudrate,CAM8B->baudrate,CAM8A->usb_read_timeout,CAM8B->usb_write_timeout,CAM8A->readbuffer_chunksize );
 
 //Purge
      if ( ftdi_usb_purge_rx_buffer ( CAM8A ) <0 ) fprintf ( stderr,"libftdi error purge RX interface A\n" );
@@ -413,10 +475,10 @@ bool cameraConnect()
 
      cameraSetGain ( 0 );      // Set a gain. that is not full of ADC
      cameraSetOffset ( 0 );
-     
-     usleep(100*1000);
+
+     usleep ( 100*1000 );
      //send init command
-     Spi_comm(0xdb,0);
+     Spi_comm ( 0xdb,0 );
 
      usleep ( 1000*100 );
 
@@ -425,6 +487,8 @@ bool cameraConnect()
      mBin=0;
 
      mCameraState=0;
+
+     cameraState = cameraIdle;
      //fprintf ( stderr,"gettemp (%" PRIu16 ")\n",CameraGetTemp() );
      isConnected = true;
      return isConnected;
@@ -447,8 +511,8 @@ void *ExposureTimerTick ( void *arg )
      dd = ( durat*1000 ) *1000;
      usleep ( dd );
      fprintf ( stderr,"--ExposureTimerTick : Tick !\n" );
-     Spi_comm(0xcb,0); //clear frame
-     usleep(1000*100);
+     Spi_comm ( 0xcb,0 ); //clear frame
+     usleep ( 1000*100 );
      readframe();
      ( void ) arg;
      pthread_exit ( NULL );
@@ -468,7 +532,7 @@ int cameraStartExposure ( int bin,int StartX,int StartY,int NumX,int NumY, doubl
      int expoz;
      pthread_t te;
 
-     mYn	= StartY / 2;
+     mYn = StartY / 2;
      Spi_comm ( 0x4B,mYn );
      mdeltY = NumY / 2;
      Spi_comm ( 0x5B,mdeltY );
@@ -494,7 +558,7 @@ int cameraStartExposure ( int bin,int StartX,int StartY,int NumX,int NumY, doubl
      mImageReady = false;
      //camera exposing
      mCameraState = 1;
-
+     cameraState = cameraExposing;
      if ( Duration > 1.0 ) {
 //          fprintf ( stderr,"--cameraStartExposure B1\n" );
           Spi_comm ( 0x2B,0 ); //shift3
@@ -533,22 +597,22 @@ bool CameraSetTemp ( float temp )
 float CameraGetTemp ( void )
 {
      Spi_comm ( 0xBF,0 );
-     //fprintf ( stderr,"--CameraGetTemp %d \n",siout );     
-     return ((float) (siout)-1280)/10;
+     //fprintf ( stderr,"--CameraGetTemp %d \n",siout );
+     return ( ( float ) ( siout )-1280 ) /10;
 }
 
 float CameraGetTempDHT ( void )
 {
      Spi_comm ( 0xF1,0 );
-     //fprintf ( stderr,"--CameraGetTempDHT %d \n",siout );     
-     return ((float) (siout)-1280)/10;
+     //fprintf ( stderr,"--CameraGetTempDHT %d \n",siout );
+     return ( ( float ) ( siout )-1280 ) /10;
 }
 
 float CameraGetHum ( void )
 {
      Spi_comm ( 0xF2,0 );
-     //fprintf ( stderr,"--CameraGetHUM %d \n",siout );     
-     return ((float) (siout))/10;
+     //fprintf ( stderr,"--CameraGetHUM %d \n",siout );
+     return ( ( float ) ( siout ) ) /10;
 }
 
 bool CameraCoolingOn ( void )
@@ -565,6 +629,7 @@ bool CameraCoolingOff ( void )
 
 uint16_t cameraGetImage ( int i,int j )
 {
+     cameraState=cameraIdle;
      return bufim[i][j];
 }
 
@@ -577,7 +642,7 @@ bool cameraGetImageReady()
 /*Set camera baudrate, return bool result*/
 bool cameraSetBaudrate ( int val )
 {
-    // fprintf ( stderr,"gettemp (%f)\n", ( float ) CameraGetTemp() /80 );
+     // fprintf ( stderr,"gettemp (%f)\n", ( float ) CameraGetTemp() /80 );
      return true;
 }
 
@@ -654,4 +719,44 @@ bool cameraSetLibftdiLatB ( int ll )
           fprintf ( stderr,"libftdi error set latency interface B\n" );
      }
      return true;
+}
+
+bool cameraSetCoolingStartingPowerPercentage ( int val )
+{
+     Spi_comm ( 0x0A,val );
+     return true;
+}
+
+bool cameraSetCoolingMaximumPowerPercentage ( int val )
+{
+     Spi_comm ( 0x1A,val );
+     return true;
+}
+
+bool cameraSetReadingTime ( int val )
+{
+     Spi_comm ( 0xEB,val );
+     return true;
+}
+
+bool cameraSetCoolerDuringReading ( int val )
+{
+     Spi_comm ( 0xFB,val );
+     return true;
+}
+float cameraGetCoolerPower ( void )
+{
+     double power;
+     if ( ( cameraState == cameraReading ) | ( cameraState == cameraDownload ) ) {
+          return coolerPowerCache;
+     } else {
+          Spi_comm ( 0xBC,0 );
+          if ( ( siout >> 8 ) == ( HIGH_MASK_PROT >> 8 ) ) {
+               power = ( siout & 0x00FF ) / 2.55;
+          } else {
+               power = coolerPowerCache;
+          };
+          coolerPowerCache = power;
+          return power;
+     };
 }

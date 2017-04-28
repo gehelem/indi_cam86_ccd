@@ -676,8 +676,9 @@ int  cameraGetCameraState()
 
 bool CameraSetTemp ( float temp )
 {
-     uint8_t d0;
-
+     uint16_t d0;
+     fprintf ( stderr,"--CameraSetTemp\n" );
+     fprintf ( stderr,"--target =  %.2f\n",temp );
      d0=1280 + temp*10;
      Spi_comm ( 0xAB,d0 );
      return true;
@@ -685,16 +686,15 @@ bool CameraSetTemp ( float temp )
 
 float cameraGetSetTemp ()
 {
-float temp;
+     float temp;
 
-    Spi_comm(0xbe,0);
-    temp = (siout - 1280) / 10.0;
-    if ((temp > 120) || (temp < -120)) 
-    {
-        temp = targetTempCache;
-    }
-    targetTempCache = temp;
-    return temp;
+     Spi_comm ( 0xbe,0 );
+     temp = ( siout - 1280 ) / 10.0;
+     if ( ( temp > 120 ) || ( temp < -120 ) ) {
+          temp = targetTempCache;
+     }
+     targetTempCache = temp;
+     return temp;
 }
 
 float CameraGetTemp ( void )
@@ -720,19 +720,22 @@ float CameraGetHum ( void )
 
 bool CameraCoolingOn ( void )
 {
+     fprintf ( stderr,"--CameraCoolingOn\n" );
+
      Spi_comm ( 0x9B,1 );
      return true;
 }
 
 bool CameraCoolingOff ( void )
 {
+     fprintf ( stderr,"--CameraCoolingOff\n" );
      Spi_comm ( 0x9B,0 );
      return true;
 }
 
 bool cameraGetCoolerOn ( void )
 {
-     if ( ( cameraState = cameraReading ) || ( cameraState = cameraDownload ) ) {
+     if ( ( cameraState == cameraReading ) || ( cameraState == cameraDownload ) ) {
           return coolerOnCache;
      } else {
           Spi_comm ( 0xbd,0 );
@@ -747,7 +750,7 @@ bool cameraGetCoolerOn ( void )
           }
      }
 }
-   
+
 uint16_t cameraGetImageXY ( int i,int j )
 {
      cameraState=cameraIdle;
@@ -757,9 +760,9 @@ uint16_t cameraGetImageXY ( int i,int j )
 //Get back pointer to image
 char *cameraGetImage()
 {
-    cameraState=cameraDownload;
-    cameraState=cameraIdle;
-    return *bufim;
+     cameraState=cameraDownload;
+     cameraState=cameraIdle;
+     return 0;//*bufim;
 }
 
 /*Check ImageReady flag, is image ready for transfer - transfer image to driver and return bool ImageReady flag*/
@@ -852,10 +855,10 @@ bool cameraSetLibftdiLatB ( int ll )
 //Get camera error state, return bool result
 int cameraGetError()
 {
-int res=0;
-  if (errorWriteFlag) res =res+2;
-  if (errorReadFlag)  res =res+1;
-  return res;
+     int res=0;
+     if ( errorWriteFlag ) res =res+2;
+     if ( errorReadFlag )  res =res+1;
+     return res;
 }
 
 bool cameraSetCoolingStartingPowerPercentage ( int val )
@@ -878,15 +881,15 @@ bool cameraSetReadingTime ( int val )
      return true;
 }
 
-bool cameraSetCoolerDuringReading ( int val )
+bool cameraSetCoolerDuringReading ( bool val )
 {
-     Spi_comm ( 0xFB,val );
+     Spi_comm ( 0xFB,!val );
      return true;
 }
 float cameraGetCoolerPower ( void )
 {
      double power;
-     if ( ( cameraState == cameraReading ) | ( cameraState == cameraDownload ) ) {
+     if ( ( cameraState == cameraReading ) || ( cameraState == cameraDownload ) ) {
           return coolerPowerCache;
      } else {
           Spi_comm ( 0xBC,0 );
@@ -902,7 +905,7 @@ float cameraGetCoolerPower ( void )
 
 int cameraGetFirmwareVersion()
 {
-     if ( ( cameraState = cameraReading ) || ( cameraState = cameraDownload ) ) {
+     if ( ( cameraState == cameraReading ) || ( cameraState == cameraDownload ) ) {
           return firmwareVersionCache;
      } else {
           Spi_comm ( 0xbb,0 );
@@ -913,46 +916,84 @@ int cameraGetFirmwareVersion()
 
 int cameraGetLLDriverVersion ()
 {
-    return softwareLLDriverVersion;
+     return softwareLLDriverVersion;
 }
 
-bool cameraSetBiasBeforeExposure(bool val)
+bool cameraSetBiasBeforeExposure ( bool val )
 {
-    sensorClear = val;
-    return true;
+     sensorClear = val;
+     return true;
 }
 
 int cameraGetCoolingStartingPowerPercentage ()
 {
-    if ((cameraState = cameraReading) || (cameraState = cameraDownload))
-    {
-        return CoolingStartingPowerPercentageCache;
-    }
-    else
-    {
-        Spi_comm(0xba,0);
-        CoolingStartingPowerPercentageCache = siout;
-        return CoolingStartingPowerPercentageCache;
-    }
+     if ( ( cameraState == cameraReading ) || ( cameraState == cameraDownload ) ) {
+          return CoolingStartingPowerPercentageCache;
+     } else {
+          Spi_comm ( 0xba,0 );
+          CoolingStartingPowerPercentageCache = siout;
+          return CoolingStartingPowerPercentageCache;
+     }
 }
 
 int cameraGetCoolingMaximumPowerPercentage ()
 {
-    if ((cameraState = cameraReading) || (cameraState = cameraDownload)) 
-    {
-        return CoolingMaximumPowerPercentageCache;
-    }
-    else
-    {
-        Spi_comm(0xb9,0);
-        CoolingMaximumPowerPercentageCache = siout;
-        return CoolingMaximumPowerPercentageCache;
-    }
+     if ( ( cameraState == cameraReading ) || ( cameraState == cameraDownload ) ) {
+          return CoolingMaximumPowerPercentageCache;
+     } else {
+          Spi_comm ( 0xb9,0 );
+          CoolingMaximumPowerPercentageCache = siout;
+          return CoolingMaximumPowerPercentageCache;
+     }
 }
 
-bool cameraSetPIDproportionalGain(float val)
+bool cameraSetPIDproportionalGain ( float val )
 {
-    Spi_comm(0x2a, val*1000);
-    KpCache = val;
-    return true;
+     Spi_comm ( 0x2a, val*1000 );
+     KpCache = val;
+     return true;
 }
+
+int16_t cameraGetPIDproportionalGainLow()
+{
+     Spi_comm ( 0xb8,0 );
+     return siout;
+}
+
+int16_t cameraGetPIDproportionalGainHigh()
+{
+     Spi_comm ( 0xb7,0 );
+     return siout;
+}
+
+double cameraGetPIDproportionalGain ()
+{
+     if ( ( cameraState == cameraReading ) || ( cameraState == cameraDownload ) ) {
+          fprintf ( stderr,"cache ! %d\n",cameraState );
+
+          return KpCache;
+     } else {
+          // this is a pain, AVR compiler fails to convert float to integers correctly
+          // under some conditions.
+          // for example
+          // float x = 0.4*1000.0 equals 400.0 while
+          // float a = 0.4;
+          // float x = a * 1000.0 equals 100.0
+          // ??????
+          // we read 4-byte long byte array and convert it to a floating point
+
+          int16_t low,high;
+          low = cameraGetPIDproportionalGainLow();
+          high = cameraGetPIDproportionalGainHigh();
+          char temp[4];
+          temp[0]=low & 0xff;
+          temp[1]=low >> 8;
+          temp[2]=high & 0xff;
+          temp[3]=high >> 8;
+          KpCache = *temp;
+          fprintf ( stderr,"KpL %d KpH %d\n",low,high );
+          return KpCache/1000;
+     }
+}
+
+

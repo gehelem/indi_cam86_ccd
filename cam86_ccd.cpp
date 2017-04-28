@@ -36,6 +36,7 @@ const float TEMP_THRESHOLD = .25;		/* Differential temperature threshold (C)*/
 /* Macro shortcut to CCD temperature value */
 #define currentCCDTemperature   TemperatureN[0].value
 #define LIBFTDI_TAB     "LibFTDI"
+#define COOLER_TAB     "Cooler"
 
 std::unique_ptr<Cam86CCD> simpleCCD ( new Cam86CCD() );
 
@@ -192,6 +193,32 @@ bool Cam86CCD::ISNewNumber ( const char *dev, const char *name,
 bool Cam86CCD::ISNewSwitch ( const char *dev, const char *name,
                              ISState *states, char *names[], int n )
 {
+  if ( strcmp ( dev,getDeviceName() ) ==0 )
+    {
+
+
+      /* Cooler */
+      if ( !strcmp ( name, CoolerSP.name ) )
+        {
+          if ( IUUpdateSwitch ( &CoolerSP, states, names, n ) < 0 ) return false;
+
+          if ( CoolerS[0].s == ISS_ON )
+            {
+              cameraSetCoolingStartingPowerPercentage ( 60 );
+              cameraSetCoolingMaximumPowerPercentage ( 100 );
+              //cameraSetPIDproportionalGain ( 0.3 );
+              cameraSetCoolerDuringReading(true);
+              CameraCoolingOn();
+            }
+          else
+            CameraCoolingOff();
+
+          return true;
+        }
+
+
+    }
+
   return INDI::CCD::ISNewSwitch ( dev, name, states, names,  n );
 }
 
@@ -206,17 +233,28 @@ bool Cam86CCD::Connect()
   // Let's set a timer that checks teleCCDs status every POLLMS milliseconds.
   SetTimer ( POLLMS );
   //cameraSetBaudrate(80);
-  cameraConnect();
-  cameraSetBaudrateA ( BRA );
-  cameraSetBaudrateB ( BRB );
-  usleep(500*1000);
-  cameraSetOffset ( -20 );
-  cameraSetGain ( 0 );
-  IDMessage ( getDeviceName(), "Cam86 connected successfully!\n" );
-  cameraSetCoolingStartingPowerPercentage(60);
-  cameraSetCoolingMaximumPowerPercentage(100);
-  cameraSetReadingTime(10);
-  cameraSetCoolerDuringReading(true);
+  if ( cameraConnect() )
+    {
+      cameraSetBaudrateA ( BRA );
+      cameraSetBaudrateB ( BRB );
+      usleep ( 500*1000 );
+      cameraSetOffset ( -20 );
+      cameraSetGain ( 0 );
+      IDMessage ( getDeviceName(), "Cam86 connected successfully!\n" );
+      //cameraSetCoolingStartingPowerPercentage ( 60 );
+      //cameraSetCoolingMaximumPowerPercentage ( 100 );
+      //cameraSetPIDproportionalGain ( 0.04 );
+      cameraSetReadingTime ( 10 );
+      //cameraSetCoolerDuringReading ( true );
+      return true;
+    }
+  else
+    {
+      IDMessage ( getDeviceName(), "Cam86 connection error\n" );
+      return false;
+
+    }
+
   //CameraSetTemp(0);
   //CameraCoolingOn();
 
@@ -302,6 +340,13 @@ bool Cam86CCD::initProperties()
   IUFillNumberVector ( &LibftditimerBNP, LibftditimerBN, 1, getDeviceName(),"TIMERB",
                        "TimerB", LIBFTDI_TAB, IP_RW, 0, IPS_IDLE );
 
+  IUFillSwitch ( &CoolerS[0], "COOLER_ON", "ON", ISS_OFF );
+  IUFillSwitch ( &CoolerS[1], "COOLER_OFF", "OFF", ISS_ON );
+  IUFillSwitchVector ( &CoolerSP, CoolerS, 2, getDeviceName(), "CCD_COOLER", "Cooler", COOLER_TAB, IP_WO, ISR_1OFMANY, 0, IPS_IDLE );
+
+  IUFillNumber ( &CoolerN[0], "CCD_COOLER_VALUE", "Cooling Power (%)", "%+06.2f", 0., 1., .2, 0.0 );
+  IUFillNumberVector ( &CoolerNP, CoolerN, 1, getDeviceName(), "CCD_COOLER_POWER", "Cooling Power", COOLER_TAB, IP_RO, 60, IPS_IDLE );
+
 
 
   // We set the CCD capabilities
@@ -341,6 +386,8 @@ bool Cam86CCD::updateProperties()
       defineNumber ( &LibftdilatencyANP );
       defineNumber ( &LibftditimerBNP );
       defineNumber ( &LibftdilatencyBNP );
+      defineSwitch ( &CoolerSP );
+      defineNumber ( &CoolerNP );
     }
   else
     {
@@ -353,6 +400,9 @@ bool Cam86CCD::updateProperties()
       deleteProperty ( LibftdilatencyANP.name );
       deleteProperty ( LibftditimerBNP.name );
       deleteProperty ( LibftdilatencyBNP.name );
+      deleteProperty ( CoolerSP.name );
+      deleteProperty ( CoolerNP.name );
+
     }
 
   return true;
@@ -412,6 +462,12 @@ bool Cam86CCD::AbortExposure()
 int Cam86CCD::SetTemperature ( double temperature )
 {
   TemperatureRequest = temperature;
+  CameraCoolingOn();
+  cameraSetCoolingStartingPowerPercentage ( 60 );
+  cameraSetCoolingMaximumPowerPercentage ( 100 );
+  //cameraSetPIDproportionalGain ( 0.3 );
+  //CameraCoolingOn;
+  CameraSetTemp ( (float) temperature );
 
   // 0 means it will take a while to change the temperature
   return 0;
@@ -472,57 +528,61 @@ void Cam86CCD::TimerHit()
     }
 
   // TemperatureNP is defined in INDI::CCD
-    //if ((TemperatureUpdateCounter++ > TEMPERATURE_UPDATE_FREQ) && !InExposure)
-    if ((TemperatureUpdateCounter++ > TEMPERATURE_UPDATE_FREQ) )
+  //if ((TemperatureUpdateCounter++ > TEMPERATURE_UPDATE_FREQ) && !InExposure)
+  if ( ( TemperatureUpdateCounter++ > TEMPERATURE_UPDATE_FREQ ) )
     {
-	    TemperatureUpdateCounter = 0;
-	    currentCCDTemperature = CameraGetTemp();
-	    float tempDHT=CameraGetTempDHT();
-	    float HUM=CameraGetHum();
-	    float coolerpower = cameraGetCoolerPower();
-	
-            const double a = 17.27;
-            const double b = 237.7;
-            double dewpoint = 0; 
+      TemperatureUpdateCounter = 0;
+      currentCCDTemperature = CameraGetTemp();
+      float tempDHT=CameraGetTempDHT();
+      float HUM=CameraGetHum();
+      float coolerpower = cameraGetCoolerPower();
+      float Kp = cameraGetPIDproportionalGain();
+      int coolerStart = cameraGetCoolingStartingPowerPercentage();
+      int coolerMax = cameraGetCoolingMaximumPowerPercentage();
+      float settemp = cameraGetSetTemp();
 
-            double c = log(HUM / 100) + a * tempDHT / (b + tempDHT);
-            dewpoint = b * c / (a - c);
-    
-	    
-	    IDMessage ( getDeviceName(), "CCD %.2f°C Ext %.2f Hum %.2f DP %.1f CoolerPower %.2f\n" , currentCCDTemperature,tempDHT,HUM,dewpoint,coolerpower); 
-	   // TemperatureN[0].value =currentCCDTemperature;
-	    
+      const double a = 17.27;
+      const double b = 237.7;
+      double dewpoint = 0;
+
+      double c = log ( HUM / 100 ) + a * tempDHT / ( b + tempDHT );
+      dewpoint = b * c / ( a - c );
+
+
+      IDMessage ( getDeviceName(), "CCD %.2f/%.2f°C Ext %.2f Hum %.2f DP %.1f CoolerPower %.2f Kp %.2f - %d-%d\n" , currentCCDTemperature,settemp,tempDHT,HUM,dewpoint,coolerpower,Kp,coolerStart,coolerMax );
+      // TemperatureN[0].value =currentCCDTemperature;
+
     }
   switch ( TemperatureNP.s )
     {
     case IPS_IDLE:
     case IPS_OK:
-	    if (fabs(currentCCDTemperature - TemperatureN[0].value) > TEMP_THRESHOLD)
-	    {
-            IDSetNumber(&TemperatureNP, NULL);
-	    TemperatureNP.s = IPS_BUSY;
-	    }
+      if ( fabs ( currentCCDTemperature - TemperatureN[0].value ) > TEMP_THRESHOLD )
+        {
+          IDSetNumber ( &TemperatureNP, NULL );
+          TemperatureNP.s = IPS_BUSY;
+        }
       break;
 
     case IPS_BUSY:
       /* If target temperature is higher, then increase current CCD temperature */
       if ( currentCCDTemperature < TemperatureRequest )
-      {
-        //currentCCDTemperature++;
-	      CameraCoolingOff();
-      }
+        {
+          //currentCCDTemperature++;
+          //CameraCoolingOff();
+        }
       /* If target temperature is lower, then decrese current CCD temperature */
-      else if ( currentCCDTemperature > TemperatureRequest ) 
-      {
-        //currentCCDTemperature--;
-	      CameraCoolingOn();
-      }
+      else if ( currentCCDTemperature > TemperatureRequest )
+        {
+          //currentCCDTemperature--;
+          //CameraCoolingOn();
+        }
       /* If they're equal, stop updating */
       else
         {
           TemperatureNP.s = IPS_OK;
           IDSetNumber ( &TemperatureNP, "Target temperature reached." );
-	  CameraCoolingOff();
+          //CameraCoolingOff();
           break;
         }
 
@@ -533,6 +593,7 @@ void Cam86CCD::TimerHit()
     case IPS_ALERT:
       break;
     }
+
 
   SetTimer ( POLLMS );
   return;
@@ -609,4 +670,5 @@ int main(void)
 }
 
 */
+
 

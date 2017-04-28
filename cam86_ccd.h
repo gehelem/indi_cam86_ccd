@@ -86,9 +86,21 @@ private:
      INumber LibftdilatencyBN[1];
      INumberVectorProperty LibftdilatencyBNP;
 
+     INumber CoolerN[1];
+     INumberVectorProperty CoolerNP;
+
+     ISwitch CoolerS[2];
+     ISwitchVectorProperty CoolerSP;
+
+     INumber CoolerStartN[1];
+     INumberVectorProperty CoolerStartNP;
+
+     INumber CoolerMaxN[1];
+     INumberVectorProperty CoolerMaxNP;
+
      float ExposureRequest;
      float TemperatureRequest;
-     int   TemperatureUpdateCounter;    
+     int   TemperatureUpdateCounter;
      float currentCCDTemperature;
      int   timerID;
 

@@ -61,8 +61,9 @@ bool cameraSetLibftdiLatA ( int ll );
 bool cameraSetLibftdiLatB ( int ll );
 bool cameraSetCoolingStartingPowerPercentage(int val);
 bool cameraSetCoolingMaximumPowerPercentage(int val);
+float cameraGetSetTemp (void);
 bool cameraSetReadingTime(int val);
-bool cameraSetCoolerDuringReading(int val);
+bool cameraSetCoolerDuringReading(bool val);
 float cameraGetCoolerPower(void);
 int  cameraGetCameraState(void);
 int cameraGetError(void);
@@ -72,6 +73,7 @@ bool cameraSetBiasBeforeExposure(bool val);
 int cameraGetCoolingStartingPowerPercentage (void);
 int cameraGetCoolingMaximumPowerPercentage (void);
 bool cameraSetPIDproportionalGain(float val);
+double cameraGetPIDproportionalGain (void);
 
 
 

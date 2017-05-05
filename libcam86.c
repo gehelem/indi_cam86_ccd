@@ -991,7 +991,7 @@ double cameraGetPIDproportionalGain ()
         temp[2]=high & 0xff;
         temp[3]=high >> 8;
         KpCache = *temp;
-        fprintf ( stderr,"KpL %d KpH %d\n",low,high );
+        //fprintf ( stderr,"KpL %d KpH %d\n",low,high );
         return KpCache/1000;
     }
 }

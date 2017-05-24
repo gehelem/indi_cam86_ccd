@@ -28,81 +28,83 @@
 
 class Cam86CCD : public INDI::CCD {
 public:
-     Cam86CCD();
+    Cam86CCD();
 
-     bool ISNewNumber ( const char *dev, const char *name, double values[], char *names[], int n );
-     bool ISNewSwitch ( const char *dev, const char *name, ISState *states, char *names[], int n );
+    bool ISNewNumber ( const char *dev, const char *name, double values[], char *names[], int n );
+    bool ISNewSwitch ( const char *dev, const char *name, ISState *states, char *names[], int n );
 
 
 protected:
-     // General device functions
-     bool Connect();
-     bool Disconnect();
-     const char *getDefaultName();
-     bool initProperties();
-     bool updateProperties();
+    // General device functions
+    bool Connect();
+    bool Disconnect();
+    const char *getDefaultName();
+    bool initProperties();
+    bool updateProperties();
 
-     // CCD specific functions
-     bool StartExposure ( float duration );
-     bool AbortExposure();
-     int SetTemperature ( double temperature );
-     void TimerHit();
+    // CCD specific functions
+    bool StartExposure ( float duration );
+    bool AbortExposure();
+    int SetTemperature ( double temperature );
+    void TimerHit();
 
 private:
-     // Utility functions
-     float CalcTimeLeft();
-     void  setupParams();
-     void  grabImage();
+    // Utility functions
+    float CalcTimeLeft();
+    void  setupParams();
+    void  grabImage();
+    void activateCooler(bool enable);
 
-     // Are we exposing?
-     bool InExposure;
-     // Struct to keep timing
-     struct timeval ExpStart;
+    // Are we exposing?
+    bool InExposure;
+    // Struct to keep timing
+    struct timeval ExpStart;
 
-     INumber GainN[1];
-     INumberVectorProperty GainNP;
+    INumber GainN[1];
+    INumberVectorProperty GainNP;
 
-     INumber OffsetN[1];
-     INumberVectorProperty OffsetNP;
+    INumber OffsetN[1];
+    INumberVectorProperty OffsetNP;
 
 //     INumber BaudrateN[1];
 //     INumberVectorProperty BaudrateNP;
 
-     INumber BaudrateAN[1];
-     INumberVectorProperty BaudrateANP;
+    INumber BaudrateAN[1];
+    INumberVectorProperty BaudrateANP;
 
-     INumber BaudrateBN[1];
-     INumberVectorProperty BaudrateBNP;
+    INumber BaudrateBN[1];
+    INumberVectorProperty BaudrateBNP;
 
-     INumber LibftditimerAN[1];
-     INumberVectorProperty LibftditimerANP;
+    INumber LibftditimerAN[1];
+    INumberVectorProperty LibftditimerANP;
 
-     INumber LibftdilatencyAN[1];
-     INumberVectorProperty LibftdilatencyANP;
+    INumber LibftdilatencyAN[1];
+    INumberVectorProperty LibftdilatencyANP;
 
-     INumber LibftditimerBN[1];
-     INumberVectorProperty LibftditimerBNP;
+    INumber LibftditimerBN[1];
+    INumberVectorProperty LibftditimerBNP;
 
-     INumber LibftdilatencyBN[1];
-     INumberVectorProperty LibftdilatencyBNP;
+    INumber LibftdilatencyBN[1];
+    INumberVectorProperty LibftdilatencyBNP;
 
-     INumber CoolerN[1];
-     INumberVectorProperty CoolerNP;
+    INumber CoolerN[1];
+    INumberVectorProperty CoolerNP;
 
-     ISwitch CoolerS[2];
-     ISwitchVectorProperty CoolerSP;
+    ISwitch CoolerS[2];
+    ISwitchVectorProperty CoolerSP;
 
-     INumber CoolerStartN[1];
-     INumberVectorProperty CoolerStartNP;
+    INumber CoolerStartN[1];
+    INumberVectorProperty CoolerStartNP;
 
-     INumber CoolerMaxN[1];
-     INumberVectorProperty CoolerMaxNP;
+    INumber CoolerMaxN[1];
+    INumberVectorProperty CoolerMaxNP;
 
-     float ExposureRequest;
-     float TemperatureRequest;
-     int   TemperatureUpdateCounter;
-     float currentCCDTemperature;
-     int   timerID;
+    float ExposureRequest;
+    float TemperatureRequest;
+    int   TemperatureUpdateCounter;
+    float currentCCDTemperature;
+    double targetTemperature;
+    int   timerID;
 
 };
 

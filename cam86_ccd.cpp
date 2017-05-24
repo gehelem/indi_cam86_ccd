@@ -353,6 +353,7 @@ bool Cam86CCD::initProperties()
 
     // We set the CCD capabilities
     uint32_t cap = CCD_CAN_ABORT | CCD_CAN_BIN | CCD_CAN_SUBFRAME | CCD_HAS_BAYER | CCD_HAS_COOLER;
+    //uint32_t cap = CCD_CAN_ABORT | CCD_CAN_BIN | CCD_CAN_SUBFRAME | CCD_HAS_COOLER;
     SetCCDCapability ( cap );
     IUSaveText ( &BayerT[2], "GRBG" );
     // Add Debug, Simulator, and Configuration controls

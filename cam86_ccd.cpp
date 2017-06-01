@@ -442,7 +442,7 @@ void Cam86CCD::setupParams()
     TemperatureN[0].value = temperature;			/* CCD chip temperatre (degrees C) */
     IDSetNumber(&TemperatureNP, NULL);
 
-    cameraSetCoolingStartingPowerPercentage ( 60 );
+    cameraSetCoolingStartingPowerPercentage ( 100 );
     cameraSetCoolingMaximumPowerPercentage ( 100 );
     cameraSetPIDproportionalGain ( 0.04 );
 

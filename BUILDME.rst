@@ -23,7 +23,7 @@ Clone cam86 driver somewhere on your machine (here ~/tmp)
   cd
   mkdir tmp
   cd tmp
-  git clone github.com/gehelem/indi_cam86_ccd.git
+  git clone https://github.com/gehelem/indi_cam86_ccd.git
   cd indi_cam86_ccd
 
 Then switch to my lastest code :

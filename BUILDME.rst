@@ -1,6 +1,6 @@
 First, libftdi is the tricky one
 Try to follow this :
-http://developer.intra2net.com/mailarchive/html...i/2013/msg00014.html
+http://developer.intra2net.com/mailarchive/html/libftdi/2013/msg00014.html
 (until step 4)
 
 Then :

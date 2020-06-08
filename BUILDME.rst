@@ -16,6 +16,13 @@ install indilib dev prerequisites :
 
   sudo apt-get install cdbs libcfitsio-dev libnova-dev libusb-1.0-0-dev libjpeg-dev libusb-dev libtiff5-dev libftdi-dev fxload libkrb5-dev libcurl4-gnutls-dev libraw-dev libgphoto2-dev libgsl0-dev dkms libboost-regex-dev libgps-dev libdc1394-22-dev
 
+install indilib dev :
+
+.. code-block:: shell
+
+  sudo apt-get install libindi-dev
+  
+  
 Clone cam86 driver somewhere on your machine (here ~/tmp)
 
 .. code-block:: shell

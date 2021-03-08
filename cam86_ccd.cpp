@@ -27,10 +27,10 @@
 #include "cam86_ccd.h"
 #include "libcam86.h"
 
-const int POLLMS           = 300;       /* Polling interval 500 ms */
-const int MAX_CCD_TEMP     = 45;		/* Max CCD temperature */
-const int MIN_CCD_TEMP	   = -55;		/* Min CCD temperature */
-const float TEMP_THRESHOLD = .25;		/* Differential temperature threshold (C)*/
+#define POLLMS           300        /* Polling interval 500 ms */
+#define MAX_CCD_TEMP      45		/* Max CCD temperature */
+#define MIN_CCD_TEMP	 -55		/* Min CCD temperature */
+#define TEMP_THRESHOLD  0.25		/* Differential temperature threshold (C)*/
 #define TEMPERATURE_UPDATE_FREQ 40      /* Update every 40 POLLMS ~ 20 second */
 
 /* Macro shortcut to CCD temperature value */

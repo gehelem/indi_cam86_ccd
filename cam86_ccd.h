@@ -23,7 +23,6 @@
     refer to the INDI Generic CCD driver template in INDI SVN (under 3rdparty).
 */
 
-
 #include <indiccd.h>
 
 class Cam86CCD : public INDI::CCD {
@@ -32,6 +31,11 @@ public:
 
     bool ISNewNumber ( const char *dev, const char *name, double values[], char *names[], int n );
     bool ISNewSwitch ( const char *dev, const char *name, ISState *states, char *names[], int n );
+    IPState GuideNorth(unsigned int) {}
+    IPState GuideSouth(unsigned int) {}
+    IPState GuideEast(unsigned int) {}
+    IPState GuideWest(unsigned int) {}
+    void GuideComplete(INDI_EQ_AXIS axis) {}
 
 
 protected:

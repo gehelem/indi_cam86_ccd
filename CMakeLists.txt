@@ -18,6 +18,7 @@ add_library(cam86 libcam86.c)
 
 find_package(CFITSIO REQUIRED)
 find_package(INDI REQUIRED)
+find_package(INDI COMPONENTS client driver REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package ( LibFTDI1 NO_MODULE REQUIRED )
 include ( ${LIBFTDI_USE_FILE} )
@@ -42,7 +43,7 @@ set(cam86ccd_SRCS
 
 add_executable(indi_cam86_ccd ${cam86ccd_SRCS})
 
-target_link_libraries(indi_cam86_ccd cam86 ${LIBFTDI_LIBRARIES} ${INDI_DRIVER_LIBRARIES} ${CFITSIO_LIBRARIES} m ${ZLIB_LIBRARY})
+target_link_libraries(indi_cam86_ccd indidriver cam86 ${INDI_LIBRARIES} ${LIBFTDI_LIBRARIES}  ${CFITSIO_LIBRARIES} m ${ZLIB_LIBRARY} )
 
 install(TARGETS indi_cam86_ccd RUNTIME DESTINATION bin)
 
